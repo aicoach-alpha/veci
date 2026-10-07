@@ -11,6 +11,7 @@ await cp('demo/demo.css', join(site, 'demo.css'));
 
 const indexPath = join(site, 'index.html');
 let html = await readFile(indexPath, 'utf8');
+html = html.replace('<base href="/veci/" />', '<base href="./" />');
 html = html
 	.replace('</head>', '\t\t<link rel="stylesheet" href="./demo.css" />\n\t</head>')
 	.replace(
