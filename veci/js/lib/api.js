@@ -115,6 +115,12 @@ export class VeciApi {
 		return this.call('uci', 'set', { config, section, values });
 	}
 
+	uciDelete(config, section, option = null) {
+		const params = { config, section };
+		if (option) params.option = option;
+		return this.call('uci', 'delete', params);
+	}
+
 	uciCommit(config) {
 		return this.call('uci', 'commit', { config });
 	}
