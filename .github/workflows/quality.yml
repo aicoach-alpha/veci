@@ -21,8 +21,15 @@ jobs:
           version: 8.15.9
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
-      - run: pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
+      - run: pnpm exec eslint veci demo scripts eslint.config.js --max-warnings=0
       - run: pnpm build
+      - run: node scripts/build-demo.js
+
+      - name: Verify demo artifact
+        run: |
+          test -f dist/demo-site/index.html
+          test -f dist/demo-site/js/lib/api.js
+          grep -q 'VeCI Interactive Demo' dist/demo-site/index.html
 
       - name: Verify VeCI source boundary
         run: |

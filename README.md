@@ -1,10 +1,23 @@
+<div align="center">
+
 # VeCI
 
-**VeCI — Easy Configuration Interface for OpenWrt**
+**Easy Configuration Interface for OpenWrt**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-1769AA.svg)](LICENSE)
+[![VeCI Quality](https://github.com/aicoach-alpha/veci/actions/workflows/quality.yml/badge.svg)](https://github.com/aicoach-alpha/veci/actions/workflows/quality.yml)
+
+[Interactive Demo](https://aicoach-alpha.github.io/veci/) · [Features](#current-native-pages) · [Build](#install--build) · [Architecture](docs/ARCHITECTURE.md)
+
+</div>
+
+![VeCI Dashboard](docs/assets/veci-dashboard.png)
 
 VeCI is a lightweight, vendor-style administration UI for OpenWrt. It is designed for people who want a router interface that feels like a polished commercial product without losing access to OpenWrt's advanced capabilities.
 
 VeCI is not a LuCI theme. It is its own frontend and its own OpenWrt package.
+
+> **Interactive demo:** the GitHub Pages demo uses simulated router data. It is safe to click around and does not connect to a real router or save changes.
 
 ## What makes VeCI different
 
@@ -16,6 +29,14 @@ VeCI is not a LuCI theme. It is its own frontend and its own OpenWrt package.
 - **Expert fallback:** when LuCI is installed, VeCI exposes it as an Expert path while native VeCI coverage is still being completed.
 - **Safer privilege boundary:** VeCI Core uses narrow rpcd methods instead of blanket shell execution.
 - **No stored router password:** the password is never persisted by VeCI in browser storage.
+
+## Demo
+
+Open the hosted demo at **https://aicoach-alpha.github.io/veci/**.
+
+The demo runs the same VeCI frontend with a dedicated mock API layer that exists only in the GitHub Pages artifact. The OpenWrt package does **not** include demo data or the mock API.
+
+The screenshot above is generated from that demo build so the README preview stays representative of the actual VeCI UI.
 
 ## Current native pages
 

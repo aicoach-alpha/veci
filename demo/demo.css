@@ -1,0 +1,29 @@
+.demo-badge {
+	position: fixed;
+	right: 18px;
+	bottom: 18px;
+	z-index: 9999;
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	padding: 10px 14px;
+	border: 1px solid rgba(23, 105, 170, 0.22);
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.94);
+	box-shadow: 0 18px 50px rgba(15, 50, 78, 0.16);
+	backdrop-filter: blur(16px);
+	font: 12px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+	color: #46637a;
+}
+.demo-badge strong {
+	color: #1769aa;
+	font-weight: 750;
+}
+.demo-badge span {
+	color: #62748e;
+}
+@media (max-width: 720px) {
+	.demo-badge span {
+		display: none;
+	}
+}
