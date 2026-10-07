@@ -8,7 +8,7 @@
 				"network.interface.*": ["status"],
 				"network.wireless": ["status"],
 				"uci": ["get"],
-				"veci": ["capabilities", "clients", "networkInventory", "health"],
+				"veci": ["capabilities", "clients", "networkInventory", "health", "diagnostic"],
 				"veci.cellular": ["status"]
 			},
 			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]

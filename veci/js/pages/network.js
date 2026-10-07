@@ -1,4 +1,4 @@
-import { badge, escapeHtml } from '../lib/dom.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js';
 import { firstAddress, humanProtocol } from '../lib/format.js';
 
 export default {
@@ -7,7 +7,7 @@ export default {
 	eyebrow: 'ADVANCED NETWORKING',
 	icon: 'network',
 
-	async render({ api, root }) {
+	async render({ api, root, toast }) {
 		const [interfacesResult, inventory] = await Promise.all([
 			api.interfaces(),
 			api.veci('networkInventory').catch(() => ({ bridges: [], ports: [] }))
@@ -58,6 +58,57 @@ export default {
 					</div>
 				</article>
 			</div>
+
+			<section class="panel diagnostic-panel">
+				<div class="panel-heading">
+					<div><p class="eyebrow">DIAGNOSTICS</p><h3>Test connectivity</h3></div>
+				</div>
+				<form id="diagnostic-form" class="diagnostic-form">
+					<label class="field">
+						<span>Tool</span>
+						<select id="diagnostic-tool">
+							<option value="ping">Ping</option>
+							<option value="traceroute">Traceroute</option>
+						</select>
+					</label>
+					<label class="field diagnostic-target">
+						<span>Host or IP address</span>
+						<input id="diagnostic-host" type="text" value="1.1.1.1" maxlength="253" autocomplete="off" required />
+					</label>
+					<button id="diagnostic-run" class="button button-primary diagnostic-run" type="submit">Run test</button>
+				</form>
+				<pre id="diagnostic-output" class="diagnostic-output hidden" aria-live="polite"></pre>
+			</section>
 		`;
+
+		const form = root.querySelector('#diagnostic-form');
+		const runButton = root.querySelector('#diagnostic-run');
+		const output = root.querySelector('#diagnostic-output');
+
+		form?.addEventListener('submit', async event => {
+			event.preventDefault();
+			const tool = root.querySelector('#diagnostic-tool').value;
+			const target = root.querySelector('#diagnostic-host').value.trim();
+
+			if (!/^[A-Za-z0-9._:-]+$/.test(target)) {
+				toast('Use a hostname or IP address without spaces or URL paths.', 'error');
+				return;
+			}
+
+			setBusy(runButton, true, 'Running…');
+			output.classList.remove('hidden');
+			output.textContent = `Running ${tool} for ${target}…`;
+
+			try {
+				const result = await api.veci('diagnostic', { tool, target });
+				if (result.ok === false) throw new Error(result.error || 'Diagnostic failed');
+				output.textContent = result.output || 'No output returned.';
+			} catch (error) {
+				output.textContent = error.message || 'Diagnostic failed.';
+				toast(error.message || 'Diagnostic failed.', 'error');
+			} finally {
+				setBusy(runButton, false);
+			}
+		});
 	}
 };

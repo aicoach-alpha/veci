@@ -343,8 +343,15 @@ export class VeciApi {
 		return { demo: true };
 	}
 
-	async veci(method) {
+	async veci(method, params = {}) {
 		await wait(50);
+		if (method === 'diagnostic') {
+			const target = params.target || '1.1.1.1';
+			if (params.tool === 'traceroute') {
+				return { ok: true, tool: 'traceroute', target, output: `traceroute to ${target} (simulated)\n 1  192.168.1.1  0.8 ms\n 2  192.168.7.1  4.2 ms\n 3  10.20.0.1  11.6 ms\n 4  ${target}  22.4 ms` };
+			}
+			return { ok: true, tool: 'ping', target, output: `PING ${target} (simulated)\n64 bytes from ${target}: seq=0 ttl=56 time=21.8 ms\n64 bytes from ${target}: seq=1 ttl=56 time=22.1 ms\n64 bytes from ${target}: seq=2 ttl=56 time=21.5 ms\n64 bytes from ${target}: seq=3 ttl=56 time=22.0 ms\n\n4 packets transmitted, 4 received, 0% packet loss` };
+		}
 		const responses = {
 			capabilities: {
 				opennds: true,

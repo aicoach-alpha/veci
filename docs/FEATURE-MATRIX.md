@@ -14,7 +14,7 @@ When LuCI is installed, the **Expert** entry remains available until the matchin
 | Wi-Fi SSID/security edit | Yes | Yes | Ready |
 | Wi-Fi create/delete | No | Yes | Planned |
 | DHCP client list | Yes | Yes | Ready |
-| Static leases | No | Yes | Planned |
+| Static leases | Yes | Yes | Ready |
 | Firewall zone overview | Yes | Yes | Ready |
 | Port-forward overview | Yes | Yes | Ready |
 | Firewall rule editor | No | Yes | Planned |
@@ -28,12 +28,12 @@ When LuCI is installed, the **Expert** entry remains available until the matchin
 | Services / startup | No | Yes | Planned |
 | Package management | No | Yes | Planned |
 | System / kernel logs | No | Yes | Planned |
-| Diagnostics | No | Yes | Planned |
+| Diagnostics | Yes | Yes | Ready |
 | DDNS | Capability discovery | Yes | App/native planned |
 | SQM | Capability discovery | Yes | App/native planned |
 | WireGuard | Capability discovery | Yes | App/native planned |
 | Captive portal / voucher | Optional app | Yes | In development |
-| Cellular modem / SIM | Optional app | Device-specific | In development |
+| Cellular modem / SIM | Capability-driven | Device-specific | Ready when provider installed |
 
 ## Parity gate
 

@@ -99,6 +99,46 @@ method_health() {
 	printf '{ "overlay": "%s" }\n' "$overlay"
 }
 
+method_diagnostic() {
+	input=$(cat)
+	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
+	target=$(printf '%s' "$input" | jsonfilter -e '@.target' 2>/dev/null)
+	safe_target=$(clean_token "$target")
+
+	[ -n "$target" ] && [ "$safe_target" = "$target" ] && [ "${#target}" -le 253 ] || {
+		printf '{ "ok": false, "error": "invalid_target" }\n'
+		return
+	}
+
+	case "$tool" in
+		ping)
+			output=$(ping -c 4 -W 2 "$target" 2>&1)
+			rc=$?
+			;;
+		traceroute)
+			command -v traceroute >/dev/null 2>&1 || {
+				printf '{ "ok": false, "error": "traceroute_not_available" }\n'
+				return
+			}
+			output=$(traceroute -m 10 -w 1 -q 1 "$target" 2>&1)
+			rc=$?
+			;;
+		*)
+			printf '{ "ok": false, "error": "tool_not_allowed" }\n'
+			return
+			;;
+	esac
+
+	output=$(printf '%s\n' "$output" | sed -n '1,30p')
+	. /usr/share/libubox/jshn.sh
+	json_init
+	[ "$rc" -eq 0 ] && json_add_boolean ok 1 || json_add_boolean ok 0
+	json_add_string tool "$tool"
+	json_add_string target "$target"
+	json_add_string output "$output"
+	json_dump
+}
+
 method_service_action() {
 	input=$(cat)
 	service=$(printf '%s' "$input" | jsonfilter -e '@.service')
@@ -141,7 +181,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -149,6 +189,7 @@ case "$1" in
 			clients) method_clients ;;
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;
+			diagnostic) method_diagnostic ;;
 			serviceAction) method_service_action ;;
 			wifiReload) method_wifi_reload ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
