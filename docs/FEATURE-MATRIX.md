@@ -1,46 +1,46 @@
-# VeCI feature matrix
+# VeCI feature parity matrix
 
-VeCI follows a simple rule: **do not remove OpenWrt capability just because the friendly UI is not finished yet.**
+VeCI is intended to become the everyday default OpenWrt GUI without removing OpenWrt capabilities.
 
-When LuCI is installed, the **Expert** entry remains available until the matching VeCI-native surface reaches parity.
+Until a row reaches **Native**, the firmware keeps LuCI available through **Expert**. A feature is never marked Native merely because VeCI can display part of it.
 
-| Capability | VeCI native | Expert fallback | Status |
+| Area | VeCI status | Native coverage | Expert / remaining coverage |
 | --- | --- | --- | --- |
-| Router / board identity | Yes | n/a | Ready |
-| Internet interface status | Yes | Yes | Ready |
-| Interface up/down | Yes | Yes | Ready |
-| Full interface editor | Partial | Yes | Planned |
-| Wi-Fi SSID/radio status | Yes | Yes | Ready |
-| Wi-Fi SSID/security edit | Yes | Yes | Ready |
-| Wi-Fi create/delete | No | Yes | Planned |
-| DHCP client list | Yes | Yes | Ready |
-| Static leases | Yes | Yes | Ready |
-| Firewall zone overview | Yes | Yes | Ready |
-| Port-forward overview | Yes | Yes | Ready |
-| Port-forward create/delete | Yes | Yes | Ready |
-| Firewall rule editor | No | Yes | Planned |
-| Bridge / port inventory | Yes | Yes | Ready |
-| VLAN editor | No | Yes | Planned |
-| IPv4/IPv6 route editor | No | Yes | Planned |
-| System identity/runtime | Yes | Yes | Ready |
-| Reboot | Yes | Yes | Ready |
-| Backup / restore | No | Yes | Planned |
-| Firmware upgrade | No | Yes | Planned |
-| Services / startup | No | Yes | Planned |
-| Package management | No | Yes | Planned |
-| System / kernel logs | No | Yes | Planned |
-| Diagnostics | Yes | Yes | Ready |
-| DDNS | Capability discovery | Yes | App/native planned |
-| SQM | Capability discovery | Yes | App/native planned |
-| WireGuard | Capability discovery | Yes | App/native planned |
-| Captive portal / voucher | Optional app | Yes | In development |
-| Cellular modem / SIM | Capability-driven | Device-specific | Ready when provider installed |
+| Router identity | **Native** | Live model, board, firmware, kernel from `system.board` | — |
+| Home / health | **Native** | Internet state, Wi-Fi count, DHCP client count, RAM, uptime | Detailed LuCI status remains available |
+| Internet overview | **Native** | Interfaces, protocol, device, address, connect/disconnect | Protocol/IP/DNS editing still Expert |
+| Cellular | **Native when provider exists** | Signal, operator, SIM, data address, reconnect, SIM switching | Modem-specific diagnostics and uncommon AT controls stay device-specific |
+| Wi-Fi SSID | **Native** | SSID, WPA2/WPA3 personal security, password update, enable/disable, hidden flag, client isolation | — |
+| Guest Wi-Fi | **Native** | Isolated guest SSID, dedicated DHCP/firewall zone, Internet-only forwarding, safe removal of VeCI-owned sections | Complex multi-zone/custom VLAN guest layouts stay Expert |
+| Wi-Fi radio tuning | **Expert** | Radio/channel status visible | Channel width, country, power, advanced 802.11, enterprise modes |
+| Connected devices | **Native** | DHCP lease inventory, hostname/IP/MAC, lease expiry | ARP/neighbour/wireless association deep detail remains Expert |
+| DHCP reservations | **Native** | Create/remove static lease for a connected client | Advanced DHCP options remain Expert |
+| Firewall overview | **Native** | Zones, policies, rule/forward counts | Full rule editor stays Expert |
+| Port forwarding | **Native** | Create/remove IPv4 DNAT forwards with validation and confirmation | Advanced NAT/reflection/source restrictions stay Expert |
+| Network layout | **Native read** | Interfaces, bridges, physical-port inventory | Interface/device/VLAN creation and editing stay Expert |
+| Diagnostics | **Native** | Bounded ping/traceroute through narrow rpcd helper | Packet capture and advanced tools stay Expert |
+| DNS / DHCP advanced | **Expert** | Basic client/reservation workflows native | dnsmasq advanced settings, host files, relay and unusual DHCP modes |
+| System information | **Native** | Model, board, firmware, kernel, uptime, memory, load, overlay use | — |
+| Reboot | **Native** | Confirmed router reboot | — |
+| Hostname / timezone / NTP | **Expert** | Display only where applicable | Editing not yet native |
+| Firmware upgrade | **Expert** | — | Sysupgrade, compatibility check and flash workflow |
+| Backup / restore / reset | **Expert** | — | Backup archive, restore, factory reset |
+| Packages | **Expert** | App capability view only | Full apk/opkg package management |
+| Services / startup | **Expert** | Narrow allow-listed reload actions used internally | General service enable/disable/startup editor |
+| System / kernel logs | **Expert** | — | Full log viewer |
+| SSH keys / administration | **Expert** | — | SSH key and advanced administration |
+| Voucher hotspot | **In development** | Generic VeCI contract and UI planned | Current firmware voucher implementation remains staged until live gates pass |
+| Optional apps | **Capability based** | Apps page reports installed capabilities | Public VeCI app feed remains disabled until signing/release gates exist |
 
-## Parity gate
+## Parity rule
 
-A LuCI Expert link may be hidden by a custom firmware only when all features that firmware exposes have either:
+A future release may hide LuCI from the normal navigation only after every administration feature required by that firmware image is either:
 
-1. an equivalent VeCI-native workflow, or
-2. a deliberate documented replacement.
+1. implemented natively in VeCI; or
+2. deliberately classified as an optional Expert capability and still reachable.
 
-The ZBT firmware will keep Expert available during the transition.
+LuCI must not be removed from the firmware merely to make VeCI appear complete.
+
+## Resource rule
+
+Native parity does not mean installing every optional OpenWrt service. VeCI only exposes features that exist on the device. Heavy services such as DPI, long-term flow databases and large telemetry stacks remain optional packages.
