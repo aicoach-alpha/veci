@@ -119,6 +119,10 @@ const state = {
 				disabled: '0'
 			}
 		},
+		dhcp: {
+			lan: { '.type': 'dhcp', interface: 'lan', start: '100', limit: '150', leasetime: '12h' },
+			printer: { '.type': 'host', name: 'Office-Printer', mac: 'aa:10:2c:91:11:20', ip: '192.168.1.120' }
+		},
 		firewall: {
 			defaults: { '.type': 'defaults', input: 'REJECT', output: 'ACCEPT', forward: 'REJECT' },
 			lan: {
@@ -234,6 +238,7 @@ export class VeciApi {
 		if (object === 'network.wireless' && method === 'status') return this.wirelessStatus();
 		if (object === 'uci' && method === 'get') return this.uciGet(params.config, params.section || null);
 		if (object === 'uci' && method === 'set') return this.uciSet(params.config, params.section, params.values || {});
+		if (object === 'uci' && method === 'add') return this.uciAdd(params.config, params.type, params.values || {}, params.name || null);
 		if (object === 'uci' && method === 'delete') return this.uciDelete(params.config, params.section, params.option || null);
 		if (object === 'uci' && method === 'commit') return this.uciCommit(params.config);
 		if (object === 'veci.cellular') return this.cellularAction(method, params);
@@ -271,6 +276,13 @@ export class VeciApi {
 		const values = state.uci[config] || {};
 		if (!section) return { values: clone(values) };
 		return { values: { [section]: clone(values[section] || {}) } };
+	}
+
+	async uciAdd(config, type, values = {}, name = null) {
+		state.uci[config] ||= {};
+		const section = name || `cfg${Math.random().toString(16).slice(2, 8)}`;
+		state.uci[config][section] = { '.type': type, ...clone(values) };
+		return { section, demo: true };
 	}
 
 	async uciSet(config, section, values) {
