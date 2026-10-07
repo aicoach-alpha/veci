@@ -155,6 +155,7 @@ Important defaults:
 ## Project documents
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Source independence](docs/SOURCE-INDEPENDENCE.md)
 - [Feature matrix](docs/FEATURE-MATRIX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Application model](docs/addons.md)
