@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+if command -v pnpm >/dev/null 2>&1; then
+	pnpm format:check
+	pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
+else
+	echo "VeCI pre-commit: pnpm is not installed; CI will run the quality gate." >&2
+fi

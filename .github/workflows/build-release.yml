@@ -1,0 +1,93 @@
+name: VeCI Packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Build web bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.9
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-web
+          path: dist/
+
+  openwrt-25:
+    name: OpenWrt 25.12 package
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: veci-web
+          path: dist/
+      - name: Download SDK
+        run: |
+          SDK=openwrt-sdk-25.12.5-x86-64_gcc-14.3.0_musl.Linux-x86_64
+          curl -fL "https://downloads.openwrt.org/releases/25.12.5/targets/x86/64/$SDK.tar.zst" -o sdk.tar.zst
+          tar --use-compress-program=unzstd -xf sdk.tar.zst
+          echo "SDK=$SDK" >> "$GITHUB_ENV"
+      - name: Build all-architecture APK
+        run: |
+          mkdir -p "$SDK/package/veci"
+          cp Makefile rpcd-acl.json "$SDK/package/veci/"
+          cp -r files dist "$SDK/package/veci/"
+          cd "$SDK"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          make package/veci/compile V=s
+          find bin/packages -name 'veci*.apk' -print -exec cp {} /tmp/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-openwrt-25.12
+          path: /tmp/veci*.apk
+
+  openwrt-24:
+    name: OpenWrt 24.10 package
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: veci-web
+          path: dist/
+      - name: Download SDK
+        run: |
+          SDK=openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64
+          curl -fL "https://downloads.openwrt.org/releases/24.10.5/targets/x86/64/$SDK.tar.zst" -o sdk.tar.zst
+          tar --use-compress-program=unzstd -xf sdk.tar.zst
+          echo "SDK=$SDK" >> "$GITHUB_ENV"
+      - name: Build all-architecture IPK
+        run: |
+          mkdir -p "$SDK/package/veci"
+          cp Makefile rpcd-acl.json "$SDK/package/veci/"
+          cp -r files dist "$SDK/package/veci/"
+          cd "$SDK"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          make package/veci/compile V=s
+          find bin/packages -name 'veci*.ipk' -print -exec cp {} /tmp/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veci-openwrt-24.10
+          path: /tmp/veci*.ipk

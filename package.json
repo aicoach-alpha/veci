@@ -1,0 +1,31 @@
+{
+	"name": "veci",
+	"version": "0.2.0-dev",
+	"private": true,
+	"type": "module",
+	"description": "VeCI - Easy Configuration Interface for OpenWrt",
+	"keywords": ["openwrt", "ubus", "uci", "router", "management", "web-ui"],
+	"license": "MIT",
+	"scripts": {
+		"dev": "node scripts/serve.js",
+		"build": "node scripts/build.js",
+		"format": "prettier --write \"veci/**/*.{js,css,html,json}\" \"scripts/**/*.js\"",
+		"format:check": "prettier --check \"veci/**/*.{js,css,html,json}\" \"scripts/**/*.js\"",
+		"lint": "eslint veci scripts eslint.config.js",
+		"check": "pnpm format:check && pnpm exec eslint veci scripts eslint.config.js --max-warnings=0 && pnpm build",
+		"prepare": "git config core.hooksPath .githooks"
+	},
+	"devDependencies": {
+		"@eslint/js": "9.39.1",
+		"clean-css": "^5.3.3",
+		"eslint": "9.39.1",
+		"globals": "16.4.0",
+		"prettier": "^3.8.1",
+		"terser": "^5.36.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/aicoach-alpha/veci"
+	},
+	"packageManager": "pnpm@8.15.9"
+}
