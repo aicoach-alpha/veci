@@ -17,6 +17,7 @@ When LuCI is installed, the **Expert** entry remains available until the matchin
 | Static leases | Yes | Yes | Ready |
 | Firewall zone overview | Yes | Yes | Ready |
 | Port-forward overview | Yes | Yes | Ready |
+| Port-forward create/delete | Yes | Yes | Ready |
 | Firewall rule editor | No | Yes | Planned |
 | Bridge / port inventory | Yes | Yes | Ready |
 | VLAN editor | No | Yes | Planned |
