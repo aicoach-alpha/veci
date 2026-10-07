@@ -1,336 +1,93 @@
-name: Build Release Packages
+name: VeCI Packages
 
 on:
+  workflow_dispatch:
   push:
-    tags: ['[0-9]*']
-  pull_request:
-    types: [labeled, synchronize]
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
 
 jobs:
-  prepare:
-    name: Build assets
-    if: startsWith(github.ref, 'refs/tags/') || github.event.label.name == 'run-build' || (github.event_name == 'pull_request' && github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-build'))
+  web:
+    name: Build web bundle
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
         with:
-          version: 9
-
-      - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build minified assets
-        run: pnpm run build
-
-      - name: Determine version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            echo "version=0.0.0.${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Upload dist
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+          version: 8.15.9
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
-          retention-days: 1
-
-  build-ipk:
-    name: Build ipk ${{ matrix.arch }}
-    needs: prepare
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86/64
-            arch: x86_64
-            sdk_name: openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64
-          - target: ramips/mt7621
-            arch: mipsel_24kc
-            sdk_name: openwrt-sdk-24.10.5-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64
-          - target: ath79/generic
-            arch: mips_24kc
-            sdk_name: openwrt-sdk-24.10.5-ath79-generic_gcc-13.3.0_musl.Linux-x86_64
-          - target: mediatek/filogic
-            arch: aarch64_cortex-a53
-            sdk_name: openwrt-sdk-24.10.5-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64
-          - target: bcm27xx/bcm2711
-            arch: aarch64_cortex-a72
-            sdk_name: openwrt-sdk-24.10.5-bcm27xx-bcm2711_gcc-13.3.0_musl.Linux-x86_64
-          - target: ipq40xx/generic
-            arch: arm_cortex-a7_neon-vfpv4
-            sdk_name: openwrt-sdk-24.10.5-ipq40xx-generic_gcc-13.3.0_musl_eabi.Linux-x86_64
-          - target: mvebu/cortexa9
-            arch: arm_cortex-a9_vfpv3-d16
-            sdk_name: openwrt-sdk-24.10.5-mvebu-cortexa9_gcc-13.3.0_musl_eabi.Linux-x86_64
-          - target: ipq806x/generic
-            arch: arm_cortex-a15_neon-vfpv4
-            sdk_name: openwrt-sdk-24.10.5-ipq806x-generic_gcc-13.3.0_musl_eabi.Linux-x86_64
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Download dist
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: dist
+          name: veci-web
           path: dist/
 
-      - name: Cache SDK
-        id: cache-sdk
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+  openwrt-25:
+    name: OpenWrt 25.12 package
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: ${{ matrix.sdk_name }}
-          key: sdk-${{ matrix.sdk_name }}
-
-      - name: Download and extract SDK
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
+          name: veci-web
+          path: dist/
+      - name: Download SDK
         run: |
-          SDK_URL="https://downloads.openwrt.org/releases/24.10.5/targets/${{ matrix.target }}/${{ matrix.sdk_name }}.tar.zst"
-          curl -L -o sdk.tar.zst "$SDK_URL"
+          SDK=openwrt-sdk-25.12.5-x86-64_gcc-14.3.0_musl.Linux-x86_64
+          curl -fL "https://downloads.openwrt.org/releases/25.12.5/targets/x86/64/$SDK.tar.zst" -o sdk.tar.zst
           tar --use-compress-program=unzstd -xf sdk.tar.zst
-          rm sdk.tar.zst
-
-      - name: Copy package files
+          echo "SDK=$SDK" >> "$GITHUB_ENV"
+      - name: Build all-architecture APK
         run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-          mkdir -p ${{ matrix.sdk_name }}/package/moci
-          sed "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" Makefile > ${{ matrix.sdk_name }}/package/moci/Makefile
-          cp -r dist ${{ matrix.sdk_name }}/package/moci/
-          cp rpcd-acl.json ${{ matrix.sdk_name }}/package/moci/
-          cp -r files ${{ matrix.sdk_name }}/package/moci/
-
-      - name: Update feeds
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
-        working-directory: ${{ matrix.sdk_name }}
-        run: |
+          mkdir -p "$SDK/package/veci"
+          cp Makefile rpcd-acl.json "$SDK/package/veci/"
+          cp -r files dist "$SDK/package/veci/"
+          cd "$SDK"
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-
-      - name: Build ipk package
-        working-directory: ${{ matrix.sdk_name }}
-        run: |
-          rm -rf bin/packages
           make defconfig
-          make package/moci/compile V=s
-
-      - name: Find and rename ipk
-        id: find_ipk
-        working-directory: ${{ matrix.sdk_name }}
-        run: |
-          IPK_FILE=$(find bin/packages -name "moci_*.ipk" | head -n 1)
-          if [ -z "$IPK_FILE" ]; then
-            echo "Error: ipk package not found!"
-            exit 1
-          fi
-          VERSION="${{ needs.prepare.outputs.version }}"
-          NEW_NAME="moci_${VERSION}-r1_${{ matrix.arch }}.ipk"
-          mv "$IPK_FILE" "/tmp/$NEW_NAME"
-          echo "package_name=$NEW_NAME" >> $GITHUB_OUTPUT
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+          make package/veci/compile V=s
+          find bin/packages -name 'veci*.apk' -print -exec cp {} /tmp/ \;
+      - uses: actions/upload-artifact@v4
         with:
-          name: moci-ipk-${{ matrix.arch }}
-          path: /tmp/${{ steps.find_ipk.outputs.package_name }}
+          name: veci-openwrt-25.12
+          path: /tmp/veci*.apk
 
-  build-apk:
-    name: Build apk ${{ matrix.arch }}
-    needs: prepare
+  openwrt-24:
+    name: OpenWrt 24.10 package
+    needs: web
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86/64
-            arch: x86_64
-            sdk_name: openwrt-sdk-25.12.0-x86-64_gcc-14.3.0_musl.Linux-x86_64
-          - target: ramips/mt7621
-            arch: mipsel_24kc
-            sdk_name: openwrt-sdk-25.12.0-ramips-mt7621_gcc-14.3.0_musl.Linux-x86_64
-          - target: ath79/generic
-            arch: mips_24kc
-            sdk_name: openwrt-sdk-25.12.0-ath79-generic_gcc-14.3.0_musl.Linux-x86_64
-          - target: mediatek/filogic
-            arch: aarch64_cortex-a53
-            sdk_name: openwrt-sdk-25.12.0-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64
-          - target: bcm27xx/bcm2711
-            arch: aarch64_cortex-a72
-            sdk_name: openwrt-sdk-25.12.0-bcm27xx-bcm2711_gcc-14.3.0_musl.Linux-x86_64
-          - target: ipq40xx/generic
-            arch: arm_cortex-a7_neon-vfpv4
-            sdk_name: openwrt-sdk-25.12.0-ipq40xx-generic_gcc-14.3.0_musl_eabi.Linux-x86_64
-          - target: mvebu/cortexa9
-            arch: arm_cortex-a9_vfpv3-d16
-            sdk_name: openwrt-sdk-25.12.0-mvebu-cortexa9_gcc-14.3.0_musl_eabi.Linux-x86_64
-          - target: ipq806x/generic
-            arch: arm_cortex-a15_neon-vfpv4
-            sdk_name: openwrt-sdk-25.12.0-ipq806x-generic_gcc-14.3.0_musl_eabi.Linux-x86_64
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Download dist
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: veci-web
           path: dist/
-
-      - name: Cache SDK
-        id: cache-sdk
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: ${{ matrix.sdk_name }}
-          key: sdk-${{ matrix.sdk_name }}
-
-      - name: Download and extract SDK
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
+      - name: Download SDK
         run: |
-          SDK_URL="https://downloads.openwrt.org/releases/25.12.0/targets/${{ matrix.target }}/${{ matrix.sdk_name }}.tar.zst"
-          curl -L -o sdk.tar.zst "$SDK_URL"
+          SDK=openwrt-sdk-24.10.5-x86-64_gcc-13.3.0_musl.Linux-x86_64
+          curl -fL "https://downloads.openwrt.org/releases/24.10.5/targets/x86/64/$SDK.tar.zst" -o sdk.tar.zst
           tar --use-compress-program=unzstd -xf sdk.tar.zst
-          rm sdk.tar.zst
-
-      - name: Copy package files
+          echo "SDK=$SDK" >> "$GITHUB_ENV"
+      - name: Build all-architecture IPK
         run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-          mkdir -p ${{ matrix.sdk_name }}/package/moci
-          sed "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" Makefile > ${{ matrix.sdk_name }}/package/moci/Makefile
-          cp -r dist ${{ matrix.sdk_name }}/package/moci/
-          cp rpcd-acl.json ${{ matrix.sdk_name }}/package/moci/
-          cp -r files ${{ matrix.sdk_name }}/package/moci/
-
-      - name: Update feeds
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
-        working-directory: ${{ matrix.sdk_name }}
-        run: |
+          mkdir -p "$SDK/package/veci"
+          cp Makefile rpcd-acl.json "$SDK/package/veci/"
+          cp -r files dist "$SDK/package/veci/"
+          cd "$SDK"
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-
-      - name: Build apk package
-        working-directory: ${{ matrix.sdk_name }}
-        run: |
-          rm -rf bin/packages
           make defconfig
-          make package/moci/compile V=s
-
-      - name: Find and rename apk
-        id: find_apk
-        working-directory: ${{ matrix.sdk_name }}
-        run: |
-          APK_FILE=$(find bin/packages -name "moci*.apk" | head -n 1)
-          if [ -z "$APK_FILE" ]; then
-            echo "Error: apk package not found!"
-            exit 1
-          fi
-          VERSION="${{ needs.prepare.outputs.version }}"
-          NEW_NAME="moci_${VERSION}-r1_${{ matrix.arch }}.apk"
-          mv "$APK_FILE" "/tmp/$NEW_NAME"
-          echo "package_name=$NEW_NAME" >> $GITHUB_OUTPUT
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+          make package/veci/compile V=s
+          find bin/packages -name 'veci*.ipk' -print -exec cp {} /tmp/ \;
+      - uses: actions/upload-artifact@v4
         with:
-          name: moci-apk-${{ matrix.arch }}
-          path: /tmp/${{ steps.find_apk.outputs.package_name }}
-
-  publish:
-    name: Publish release
-    needs: [build-ipk, build-apk]
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    steps:
-      - name: Download packages
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: moci-*
-          merge-multiple: true
-          path: packages/
-
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
-        with:
-          subject-path: packages/*
-
-      - name: Create draft release with assets
-        id: release
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
-        with:
-          draft: true
-          generate_release_notes: true
-          files: packages/*
-
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh api -X PATCH "repos/${{ github.repository }}/releases/${{ steps.release.outputs.id }}" -F draft=false
-
-  bump-version:
-    name: Sync version files on dev
-    needs: publish
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Commit version bump to dev
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/}"
-          BRANCH=dev
-          HEAD=$(gh api "repos/${GITHUB_REPOSITORY}/branches/${BRANCH}" --jq .commit.sha)
-          MAKEFILE=$(gh api "repos/${GITHUB_REPOSITORY}/contents/Makefile?ref=${BRANCH}" --jq .content | base64 -d)
-          PKGJSON=$(gh api "repos/${GITHUB_REPOSITORY}/contents/package.json?ref=${BRANCH}" --jq .content | base64 -d)
-          NEW_MAKEFILE=$(printf '%s\n' "$MAKEFILE" | sed "s/^PKG_VERSION:=.*/PKG_VERSION:=${VERSION}/")
-          NEW_PKGJSON=$(printf '%s\n' "$PKGJSON" | sed "0,/\"version\": \"[^\"]*\"/s//\"version\": \"${VERSION}\"/")
-          if [ "$NEW_MAKEFILE" = "$MAKEFILE" ] && [ "$NEW_PKGJSON" = "$PKGJSON" ]; then
-            echo "Version files already at ${VERSION}"
-            exit 0
-          fi
-          jq -n \
-            --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
-            --arg repo "${GITHUB_REPOSITORY}" \
-            --arg branch "${BRANCH}" \
-            --arg head "${HEAD}" \
-            --arg msg "Bump version files to ${VERSION}" \
-            --arg mk "$(printf '%s\n' "$NEW_MAKEFILE" | base64 -w0)" \
-            --arg pj "$(printf '%s\n' "$NEW_PKGJSON" | base64 -w0)" \
-            '{query: $query, variables: {input: {
-              branch: {repositoryNameWithOwner: $repo, branchName: $branch},
-              expectedHeadOid: $head,
-              message: {headline: $msg},
-              fileChanges: {additions: [
-                {path: "Makefile", contents: $mk},
-                {path: "package.json", contents: $pj}
-              ]}
-            }}}' | gh api graphql --input -
-          echo "Bumped ${BRANCH} to ${VERSION}"
+          name: veci-openwrt-24.10
+          path: /tmp/veci*.ipk

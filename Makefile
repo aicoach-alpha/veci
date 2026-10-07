@@ -1,95 +1,59 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=moci
+PKG_NAME:=veci
 PKG_VERSION:=0.2.0
 PKG_RELEASE:=1
 
-PKG_MAINTAINER:=HudsonGraeme
+PKG_MAINTAINER:=aicoach-alpha
 PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE
+PKGARCH:=all
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/moci
+VECI_WEB_DIR:=$(if $(wildcard ./dist/veci/index.html),./dist/veci,./veci)
+
+define Package/veci
   SECTION:=admin
   CATEGORY:=Administration
-  TITLE:=MoCI - Modern Configuration Interface for OpenWrt
-  PKGARCH:=all
-  DEPENDS:=+rpcd +jsonfilter
+  TITLE:=VeCI - Easy Configuration Interface for OpenWrt
+  DEPENDS:=+rpcd +jsonfilter +uhttpd +uhttpd-mod-ubus
 endef
 
-define Package/moci/description
-  Modern web interface for OpenWrt routers.
-  Pure vanilla JavaScript SPA using OpenWrt's native ubus API.
-  Works with uhttpd (standard OpenWrt) or lighttpd (TurrisOS).
+define Package/veci/description
+ VeCI is a lightweight, hardware-aware OpenWrt administration interface.
+ It presents common router tasks in a vendor-style UI while keeping OpenWrt
+ UCI and ubus as the source of truth.
 endef
 
 define Build/Compile
 endef
 
-define Package/moci/install
-	$(INSTALL_DIR) $(1)/www/moci
-	$(INSTALL_DATA) ./dist/moci/index.html $(1)/www/moci/
-	$(INSTALL_DATA) ./dist/moci/app.css $(1)/www/moci/
-	$(INSTALL_DATA) ./dist/moci/manifest.json $(1)/www/moci/
-
-	$(INSTALL_DIR) $(1)/www/moci/icons
-	$(INSTALL_DATA) ./dist/moci/icons/icon-192.png $(1)/www/moci/icons/
-	$(INSTALL_DATA) ./dist/moci/icons/icon-512.png $(1)/www/moci/icons/
-
-	$(INSTALL_DIR) $(1)/www/moci/js
-	$(INSTALL_DATA) ./dist/moci/js/core.js $(1)/www/moci/js/
-
-	$(INSTALL_DIR) $(1)/www/moci/js/modules
-	$(INSTALL_DATA) ./dist/moci/js/modules/dashboard.js $(1)/www/moci/js/modules/
-	$(INSTALL_DATA) ./dist/moci/js/modules/network.js $(1)/www/moci/js/modules/
-	$(INSTALL_DATA) ./dist/moci/js/modules/system.js $(1)/www/moci/js/modules/
-	$(INSTALL_DATA) ./dist/moci/js/modules/addons.js $(1)/www/moci/js/modules/
-
-	$(INSTALL_DIR) $(1)/www/moci/js/addons
-
-	$(INSTALL_DIR) $(1)/usr/libexec
-	$(INSTALL_BIN) ./files/moci-pkg-call $(1)/usr/libexec/moci-pkg-call
+define Package/veci/install
+	$(INSTALL_DIR) $(1)/www/veci
+	$(CP) $(VECI_WEB_DIR)/* $(1)/www/veci/
 
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
-	$(INSTALL_BIN) ./files/rpcd-moci $(1)/usr/libexec/rpcd/moci
+	$(INSTALL_BIN) ./files/rpcd-veci $(1)/usr/libexec/rpcd/veci
 
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
-	$(INSTALL_DATA) ./rpcd-acl.json $(1)/usr/share/rpcd/acl.d/moci.json
-
-	$(INSTALL_DIR) $(1)/usr/share/acl.d
-	$(INSTALL_DATA) ./files/ubus-acl-moci.json $(1)/usr/share/acl.d/moci.json
+	$(INSTALL_DATA) ./rpcd-acl.json $(1)/usr/share/rpcd/acl.d/veci.json
 
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/moci.config $(1)/etc/config/moci
-
-	$(INSTALL_DIR) $(1)/etc/opkg/keys
-	$(INSTALL_DATA) ./files/moci-feed.pub $(1)/etc/opkg/keys/bc0c5f67deb5edb8
-	$(INSTALL_CONF) ./files/moci-apps.conf $(1)/etc/opkg/moci-apps.conf
-
-	$(INSTALL_BIN) ./files/ubus.cgi $(1)/www/moci/ubus.cgi
-
-	$(INSTALL_DIR) $(1)/etc/lighttpd/conf.d
-	$(INSTALL_DATA) ./files/lighttpd-moci.conf $(1)/etc/lighttpd/conf.d/50-moci.conf
+	$(INSTALL_CONF) ./files/veci.config $(1)/etc/config/veci
 endef
 
-define Package/moci/conffiles
-/etc/config/moci
-/etc/opkg/moci-apps.conf
+define Package/veci/conffiles
+/etc/config/veci
 endef
 
-define Package/moci/postinst
+define Package/veci/postinst
 #!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || {
-	kill -HUP $$(pidof ubusd) 2>/dev/null
-	/etc/init.d/rpcd restart
-	if [ -f /etc/init.d/lighttpd ]; then
-		/etc/init.d/lighttpd restart
-		echo "MoCI installed (lighttpd). Access at http://[router-ip]/moci/"
-	else
-		echo "MoCI installed. Access at http://[router-ip]/moci/"
-	fi
+[ -n "${IPKG_INSTROOT}" ] || {
+	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+	/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+	echo "VeCI installed. Open http://[router-ip]/veci/"
 }
 endef
 
-$(eval $(call BuildPackage,moci))
+$(eval $(call BuildPackage,veci))

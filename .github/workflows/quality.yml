@@ -1,0 +1,50 @@
+name: VeCI Quality
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.9
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
+      - run: pnpm build
+      - name: Verify VeCI source boundary
+        run: |
+          test -f veci/js/app.js
+          test -d veci/js/pages
+          test ! -e veci/js/core.js
+          test ! -d veci/js/modules
+          test ! -d examples
+      - name: Verify no router-model hardcoding
+        run: |
+          if grep -Rni -E 'ZBT-WE5927|WE5927-OpenWrt|WE2825-2SIM' veci; then
+            echo "Generic VeCI core must discover hardware at runtime."
+            exit 1
+          fi
+      - name: Verify no administrator password persistence
+        run: |
+          if grep -Rni -E 'saved_credentials|localStorage.*(password|credential)' veci; then
+            echo "Password persistence pattern found."
+            exit 1
+          fi
+      - name: Check RPC helper syntax
+        run: sh -n files/rpcd-veci
+      - name: Bundle size
+        run: |
+          du -sh dist/veci
+          find dist/veci -type f -printf '%s\n' | awk '{ total += $1 } END { print "bundle_bytes=" total }'

@@ -1,191 +1,173 @@
-<div align="center">
+# VeCI
 
-# MoCI
+**VeCI — Easy Configuration Interface for OpenWrt**
 
-**Modern Configuration Interface for OpenWrt**
+VeCI is a lightweight, vendor-style administration UI for OpenWrt. It is designed for people who want a router interface that feels like a polished commercial product without losing access to OpenWrt's advanced capabilities.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+VeCI is not a LuCI theme. It is its own frontend and its own OpenWrt package.
 
-[Demo](https://hudsongraeme.github.io/MoCI/) • [Install](#installation) • [Features](#features)
+## What makes VeCI different
 
-</div>
+- **Task-first navigation:** Home, Internet, Wi-Fi, Devices, Security, Network, System and Apps.
+- **Hardware-aware:** the displayed manufacturer/model comes from the running OpenWrt board data; VeCI does not hardcode one router model.
+- **CoachAssist visual language:** light blue surfaces, dark navy navigation, compact cards and restrained shadows aligned with the design system used by CoachAssist / vervue.my.id.
+- **Low-resource core:** no mandatory DPI engine, flow database, traffic-history daemon or app store background service.
+- **OpenWrt-native:** UCI, ubus, rpcd, netifd, firewall4 and dnsmasq remain the source of truth.
+- **Expert fallback:** when LuCI is installed, VeCI exposes it as an Expert path while native VeCI coverage is still being completed.
+- **Safer privilege boundary:** VeCI Core uses narrow rpcd methods instead of blanket shell execution.
+- **No stored router password:** the password is never persisted by VeCI in browser storage.
 
-![MoCI Dashboard](https://github.com/user-attachments/assets/dc150d3c-75fc-480b-a0bd-10b67cdc6226)
+## Current native pages
 
----
+| Area | Native VeCI coverage |
+| --- | --- |
+| Home | Router identity, Internet status, Wi-Fi count, DHCP clients, uptime and memory |
+| Internet | Interface status, addresses, protocol, connect/disconnect |
+| Wi-Fi | Radio/SSID discovery and operational status |
+| Devices | DHCP client inventory |
+| Security | Firewall zones, rules and redirect summary |
+| Network | Interfaces, bridges and physical-port inventory |
+| System | Hardware, firmware, runtime resources and reboot |
+| Apps | Lightweight capability discovery |
 
-## What is this?
+Advanced configuration remains available through LuCI Expert until each area reaches native parity. See [docs/FEATURE-MATRIX.md](docs/FEATURE-MATRIX.md).
 
-A complete standalone web interface for OpenWrt routers. Not a LuCI theme—pure vanilla JavaScript SPA using OpenWrt's native ubus API.
+## Hardware identity
 
-```bash
-scp -r moci/* root@192.168.1.1:/www/moci/
-# Access at http://192.168.1.1/moci/
+VeCI reads the real board data from:
+
+```sh
+ubus call system board
 ```
 
----
+The UI prefers the returned `model`, `board_name`, release and kernel values.
 
-## Features
+That means:
 
-<table>
-<tr>
-<td width="50%">
+- a ZBT router shows the ZBT model reported by OpenWrt;
+- a GL.iNet, Xiaomi, TP-Link, NanoPi or x86 OpenWrt installation shows its own reported identity;
+- generic VeCI source does not contain a hardcoded WE5927 model string.
 
-### Dashboard
-- Live system stats & graphs
-- Network traffic monitoring
-- System logs
-- Active connections
-- Quick actions
+Device-specific functionality belongs in optional `veci-app-*` packages.
 
-### Network
-- Interface configuration
-- Wireless management (SSID, encryption)
-- Firewall & port forwarding
-- DHCP leases (active + static)
-- Diagnostics (ping, traceroute, WOL)
+## Architecture
 
-</td>
-<td width="50%">
-
-### System
-- Hostname & timezone
-- Password management
-- Backup & restore
-- Package management
-- Service control
-- Init script management
-
-### Design
-- Dark glassmorphic UI
-- Responsive tables
-- Real-time updates
-- Toast notifications
-- Smooth animations
-
-</td>
-</tr>
-</table>
-
----
-
-## Installation
-
-### Option 1: Package (Recommended)
-
-Download the package for your architecture from [Releases](https://github.com/HudsonGraeme/MoCI/releases/latest).
-
-**OpenWrt 24.10 and earlier (opkg):**
-
-```bash
-wget https://github.com/HudsonGraeme/MoCI/releases/latest/download/moci_VERSION_ARCH.ipk
-opkg install moci_VERSION_ARCH.ipk
+```text
+Browser
+  |
+  +-- VeCI shell
+  |    +-- task-oriented pages
+  |    +-- hardware/capability discovery
+  |    +-- CoachAssist-derived visual tokens
+  |
+  +-- /ubus
+       +-- session
+       +-- system
+       +-- network.interface
+       +-- network.wireless
+       +-- uci
+       +-- veci (narrow rpcd helper)
 ```
 
-**OpenWrt 25.12+ (apk):**
+The active source is intentionally split into small VeCI-owned modules:
 
-```bash
-wget https://github.com/HudsonGraeme/MoCI/releases/latest/download/moci_VERSION_ARCH.apk
-apk add --allow-untrusted moci_VERSION_ARCH.apk
+```text
+veci/
+  index.html
+  app.css
+  js/
+    app.js
+    lib/
+      api.js
+      dom.js
+      format.js
+      icons.js
+    pages/
+      home.js
+      internet.js
+      wifi.js
+      devices.js
+      security.js
+      network.js
+      system.js
+      apps.js
 ```
 
-Available architectures: x86_64, mipsel_24kc, mips_24kc, aarch64_cortex-a53, aarch64_cortex-a72, arm_cortex-a7_neon-vfpv4, arm_cortex-a9_vfpv3-d16, arm_cortex-a15_neon-vfpv4
+## Resource policy
 
-Replace `VERSION_ARCH` with your specific file from the releases page.
+VeCI Core is intended to remain practical on small OpenWrt hardware, including 64 MB RAM class devices.
 
-### Option 2: Manual Install
+Heavy features are optional apps:
 
-**Quick start:**
+- DPI / application classification
+- long-term flow history
+- vnStat-style history
+- advanced bandwidth accounting
+- speed-test daemons
+- cellular modem integration
+- captive portal / voucher management
 
-```bash
-scp -r moci/* root@192.168.1.1:/www/moci/
-scp rpcd-acl.json root@192.168.1.1:/usr/share/rpcd/acl.d/moci.json
-ssh root@192.168.1.1 "/etc/init.d/rpcd restart"
-```
+A feature may be visually integrated with VeCI without becoming a mandatory Core dependency.
 
-**First time setup** (if you get 404):
+## Install / build
 
-```bash
-ssh root@192.168.1.1
-uci set uhttpd.main.home='/www'
-uci commit uhttpd
-/etc/init.d/uhttpd restart
-```
-
-**What the ACL grants:**
-- WAN/LAN status display on dashboard
-- Bandwidth monitoring
-- Device count
-- Package list viewing in Software tab
-
-Access at `http://192.168.1.1/moci/` and login with your root credentials.
-
----
-
-## Building from Source
-
-To build the ipk package yourself:
+VeCI is still development software.
 
 ```bash
-# In OpenWrt buildroot
-git clone https://github.com/HudsonGraeme/MoCI.git package/moci
-make package/moci/compile
+git clone https://github.com/aicoach-alpha/veci.git
+cd veci
+pnpm install
+pnpm check
 ```
 
-The package will be in `bin/packages/*/base/moci_*.ipk` (24.10) or `bin/packages/*/base/moci-*.apk` (25.12+)
+The production web bundle is written to `dist/veci/`.
 
----
+OpenWrt packaging is defined in [Makefile](Makefile). The package is architecture-independent (`PKGARCH:=all`) and the release workflow validates both OpenWrt 24.10 and 25.12 packaging.
+
+## Custom firmware integration
+
+A firmware vendor can make VeCI the default landing page while keeping LuCI available as Expert.
+
+For the aicoach-alpha ZBT firmware, the intended integration is:
+
+```text
+default administration UI -> VeCI
+advanced compatibility UI -> LuCI Expert
+cellular controls         -> veci-app-cellular
+voucher controls          -> veci-app-voucher
+```
+
+Those device-specific apps are not hardcoded into generic VeCI Core.
 
 ## Security
 
-Uses OpenWrt's native authentication system. Same security model as LuCI:
+Read [SECURITY.md](SECURITY.md).
 
-| Feature | MoCI | LuCI |
-|---------|------|------|
-| Authentication | ubus sessions | ubus sessions |
-| Authorization | rpcd ACLs | rpcd ACLs |
+Important defaults:
 
-All operations validated server-side. No privilege escalation paths.
+- same-origin ubus access;
+- session token stored only in `sessionStorage`;
+- no persistent plaintext administrator password;
+- no generic `file.exec` permission in the VeCI Core ACL;
+- public third-party app feed disabled until VeCI has a signing/review pipeline;
+- destructive operations require explicit confirmation.
 
----
+## Project documents
 
-## Development
+- [Architecture](docs/ARCHITECTURE.md)
+- [Feature matrix](docs/FEATURE-MATRIX.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Application model](docs/addons.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Attribution](NOTICE.md)
 
-**Auto-deploy on save:**
+## Attribution
 
-```bash
-# QEMU VM
-pnpm dev
+VeCI was informed by the public MoCI project and the OpenWrt community discussion about modern router UIs. The active VeCI source has since been re-architected into its own application shell, page model, visual system, rpcd helper and packaging boundary.
 
-# Physical router
-pnpm dev:physical 192.168.1.1
-```
-
-**Project structure:**
-
-```
-moci/
-├── index.html    - Application shell
-├── app.css       - Styling
-└── js/
-    ├── core.js   - Core functionality
-    └── modules/  - Feature modules (dashboard, network, system, vpn, services)
-```
-
-**Adding features:**
-
-```javascript
-const [status, result] = await this.ubusCall('system', 'info', {});
-```
-
----
-
-## Browser Support
-
-Chrome 90+ • Firefox 88+ • Safari 14+ • Any modern browser
-
----
+The upstream attribution required for reused/derived material is retained in [NOTICE.md](NOTICE.md).
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

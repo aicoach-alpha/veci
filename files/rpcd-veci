@@ -1,0 +1,138 @@
+#!/bin/sh
+
+clean_token() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9._:-'
+}
+
+clean_text() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9 ._:/()%+-'
+}
+
+json_bool_file() {
+	[ -e "$1" ] && printf true || printf false
+}
+
+method_capabilities() {
+	opennds=$(json_bool_file /etc/config/opennds)
+	sqm=$(json_bool_file /etc/config/sqm)
+	ddns=$(json_bool_file /etc/config/ddns)
+	if command -v wg >/dev/null 2>&1 || grep -qs "option proto 'wireguard'" /etc/config/network; then
+		wireguard=true
+	else
+		wireguard=false
+	fi
+	if ubus list 2>/dev/null | grep -qx 'veci.voucher'; then
+		voucher=true
+	else
+		voucher=false
+	fi
+	printf '{ "opennds": %s, "sqm": %s, "ddns": %s, "wireguard": %s, "voucher": %s }\n' 		"$opennds" "$sqm" "$ddns" "$wireguard" "$voucher"
+}
+
+method_clients() {
+	now=$(date +%s)
+	items=''
+	if [ -f /tmp/dhcp.leases ]; then
+		while read -r expiry mac ip host _; do
+			mac=$(clean_token "$mac")
+			ip=$(clean_token "$ip")
+			host=$(clean_token "$host")
+			[ -n "$ip" ] || continue
+			[ "$host" = "*" ] && host=''
+			if [ "$expiry" -gt 0 ] 2>/dev/null; then
+				remaining=$((expiry - now))
+				[ "$remaining" -lt 0 ] && remaining=0
+			else
+				remaining=0
+			fi
+			item="{ \"expires\": $remaining, \"macaddr\": \"$mac\", \"ipaddr\": \"$ip\", \"hostname\": \"$host\" }"
+			items="${items:+$items, }$item"
+		done < /tmp/dhcp.leases
+	fi
+	printf '{ "clients": [ %s ] }\n' "$items"
+}
+
+method_network_inventory() {
+	bridges=''
+	ports=''
+
+	for path in /sys/class/net/*; do
+		[ -e "$path" ] || continue
+		name=$(clean_token "${path##*/}")
+		[ -n "$name" ] || continue
+
+		if [ -d "$path/bridge" ]; then
+			members=''
+			for member_path in "$path/brif/"*; do
+				[ -e "$member_path" ] || continue
+				member=$(clean_token "${member_path##*/}")
+				[ -n "$member" ] || continue
+				members="${members:+$members, }\"$member\""
+			done
+			bridge="{ \"name\": \"$name\", \"members\": [ $members ] }"
+			bridges="${bridges:+$bridges, }$bridge"
+			continue
+		fi
+
+		[ "$name" = "lo" ] && continue
+		[ -e "$path/phy80211" ] && continue
+		[ -e "$path/device" ] || continue
+		ports="${ports:+$ports, }\"$name\""
+	done
+
+	printf '{ "bridges": [ %s ], "ports": [ %s ] }\n' "$bridges" "$ports"
+}
+
+method_health() {
+	overlay='unavailable'
+	if command -v df >/dev/null 2>&1; then
+		overlay=$(df -h /overlay 2>/dev/null | awk 'NR==2 { printf "%s used / %s total (%s)", $3, $2, $5 }')
+		[ -n "$overlay" ] || overlay='unavailable'
+	fi
+	overlay=$(clean_text "$overlay")
+	printf '{ "overlay": "%s" }\n' "$overlay"
+}
+
+method_service_action() {
+	input=$(cat)
+	service=$(printf '%s' "$input" | jsonfilter -e '@.service')
+	action=$(printf '%s' "$input" | jsonfilter -e '@.action')
+
+	case "$service" in
+		network|firewall|dnsmasq|uhttpd|opennds) ;;
+		*) printf '{ "ok": false, "error": "service_not_allowed" }\n'; return ;;
+	esac
+
+	case "$action" in
+		start|stop|restart|reload) ;;
+		*) printf '{ "ok": false, "error": "action_not_allowed" }\n'; return ;;
+	esac
+
+	script="/etc/init.d/$service"
+	[ -x "$script" ] || {
+		printf '{ "ok": false, "error": "service_not_installed" }\n'
+		return
+	}
+
+	if "$script" "$action" >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "service_action_failed" }\n'
+	fi
+}
+
+case "$1" in
+	list)
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "serviceAction": { "service": "str", "action": "str" } }\n'
+		;;
+	call)
+		case "$2" in
+			capabilities) method_capabilities ;;
+			clients) method_clients ;;
+			networkInventory) method_network_inventory ;;
+			health) method_health ;;
+			serviceAction) method_service_action ;;
+			*) printf '{ "error": "method_not_found" }\n' ;;
+		esac
+		;;
+esac
