@@ -23,6 +23,7 @@ jobs:
       - run: pnpm format:check
       - run: pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
       - run: pnpm build
+
       - name: Verify VeCI source boundary
         run: |
           test -f veci/js/app.js
@@ -30,20 +31,33 @@ jobs:
           test ! -e veci/js/core.js
           test ! -d veci/js/modules
           test ! -d examples
+
+      - name: Verify VeCI active source is independent
+        run: |
+          if grep -Rni -E 'MoCI|moci' veci files scripts Makefile rpcd-acl.json package.json; then
+            echo "MoCI-era identifiers are not allowed in active VeCI source. Attribution belongs in NOTICE/docs only."
+            exit 1
+          fi
+          test "$(wc -c < veci/icons/veci.svg)" -gt 200
+          grep -q '<svg' veci/icons/veci.svg
+
       - name: Verify no router-model hardcoding
         run: |
           if grep -Rni -E 'ZBT-WE5927|WE5927-OpenWrt|WE2825-2SIM' veci; then
             echo "Generic VeCI core must discover hardware at runtime."
             exit 1
           fi
+
       - name: Verify no administrator password persistence
         run: |
           if grep -Rni -E 'saved_credentials|localStorage.*(password|credential)' veci; then
             echo "Password persistence pattern found."
             exit 1
           fi
+
       - name: Check RPC helper syntax
         run: sh -n files/rpcd-veci
+
       - name: Bundle size
         run: |
           du -sh dist/veci
