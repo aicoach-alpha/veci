@@ -139,6 +139,60 @@ method_diagnostic() {
 	json_dump
 }
 
+root_password_is_set() {
+	hash=$(awk -F: '$1 == "root" { print $2; exit }' /etc/shadow 2>/dev/null)
+	case "$hash" in
+		''|'!'|'*'|'!!') return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+method_security_status() {
+	if root_password_is_set; then
+		printf '{ "root_password_set": true }\n'
+	else
+		printf '{ "root_password_set": false }\n'
+	fi
+}
+
+method_set_admin_password() {
+	root_password_is_set && {
+		printf '{ "ok": false, "error": "password_already_set" }\n'
+		return
+	}
+
+	input=$(cat)
+	password=$(printf '%s' "$input" | jsonfilter -e '@.password' 2>/dev/null)
+	length=${#password}
+	flat_password=$(printf '%s' "$password" | tr -d '\r\n')
+
+	[ "$flat_password" = "$password" ] || {
+		printf '{ "ok": false, "error": "password_characters" }\n'
+		return
+	}
+
+	[ "$length" -ge 8 ] && [ "$length" -le 72 ] || {
+		printf '{ "ok": false, "error": "password_length" }\n'
+		return
+	}
+
+	LC_ALL=C printf '%s' "$password" | grep -q '^[ -~]*$' || {
+		printf '{ "ok": false, "error": "password_characters" }\n'
+		return
+	}
+
+	command -v passwd >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "passwd_not_available" }\n'
+		return
+	}
+
+	if printf '%s\n%s\n' "$password" "$password" | passwd root >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "password_change_failed" }\n'
+	fi
+}
+
 method_service_action() {
 	input=$(cat)
 	service=$(printf '%s' "$input" | jsonfilter -e '@.service')
@@ -181,7 +235,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -189,6 +243,8 @@ case "$1" in
 			clients) method_clients ;;
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;
+			securityStatus) method_security_status ;;
+			setAdminPassword) method_set_admin_password ;;
 			diagnostic) method_diagnostic ;;
 			serviceAction) method_service_action ;;
 			wifiReload) method_wifi_reload ;;

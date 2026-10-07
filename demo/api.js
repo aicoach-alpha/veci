@@ -2,6 +2,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const clone = value => JSON.parse(JSON.stringify(value));
 
 const state = {
+	rootPasswordSet: false,
 	board: {
 		kernel: '6.12.94',
 		hostname: 'VeCI-Demo',
@@ -359,6 +360,11 @@ export class VeciApi {
 
 	async veci(method, params = {}) {
 		await wait(50);
+		if (method === 'setAdminPassword') {
+			if (state.rootPasswordSet) return { ok: false, error: 'password_already_set', demo: true };
+			state.rootPasswordSet = true;
+			return { ok: true, demo: true };
+		}
 		if (method === 'diagnostic') {
 			const target = params.target || '1.1.1.1';
 			if (params.tool === 'traceroute') {
@@ -388,6 +394,7 @@ export class VeciApi {
 				temperature: '56°C',
 				load: '0.18'
 			},
+			securityStatus: { root_password_set: state.rootPasswordSet },
 			wifiReload: { demo: true, reloaded: true },
 			serviceAction: { demo: true }
 		};
