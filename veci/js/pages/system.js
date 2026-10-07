@@ -17,7 +17,9 @@ export default {
 		const memory = formatMemory(info.memory || {});
 		const model = board.model || board.board_name || 'OpenWrt Router';
 		const firmware = board.release?.description || board.release?.version || 'OpenWrt';
-		const systemSection = Object.entries(systemConfig.values || {}).find(([, value]) => value['.type'] === 'system');
+		const systemSection = Object.entries(systemConfig.values || {}).find(
+			([, value]) => value['.type'] === 'system'
+		);
 		const systemSectionId = systemSection?.[0] || null;
 		const configuredHostname = systemSection?.[1]?.hostname || board.hostname || 'OpenWrt';
 
