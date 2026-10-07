@@ -31,6 +31,12 @@ jobs:
           test -f dist/demo-site/js/lib/api.js
           grep -q 'VeCI Interactive Demo' dist/demo-site/index.html
 
+
+      - name: Verify router-root asset base
+        run: |
+          grep -q '<base href="/veci/" />' dist/veci/index.html
+          grep -q '<base href="./" />' dist/demo-site/index.html
+
       - name: Verify VeCI source boundary
         run: |
           test -f veci/js/app.js
