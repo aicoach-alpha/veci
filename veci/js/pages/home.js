@@ -16,6 +16,19 @@ function wifiNetworks(status) {
 	return Object.values(status || {}).flatMap(radio => radio.interfaces || []);
 }
 
+function configuredWireless(configResult, type) {
+	return Object.values(configResult?.values || {}).filter(section => section['.type'] === type);
+}
+
+function wifiInventory(status, configResult) {
+	const runtimeRadios = Object.values(status || {});
+	const runtimeNetworks = wifiNetworks(status);
+	return {
+		radios: runtimeRadios.length ? runtimeRadios : configuredWireless(configResult, 'wifi-device'),
+		networks: runtimeNetworks.length ? runtimeNetworks : configuredWireless(configResult, 'wifi-iface')
+	};
+}
+
 export default {
 	id: 'home',
 	title: 'Home',
@@ -24,10 +37,11 @@ export default {
 	icon: 'home',
 
 	async render({ api, state, root, navigate, toast }) {
-		const [system, interfacesResult, wireless, clients, security] = await Promise.all([
+		const [system, interfacesResult, wireless, wirelessConfig, clients, security] = await Promise.all([
 			api.systemInfo(),
 			api.interfaces(),
 			api.wirelessStatus().catch(() => ({})),
+			api.uciGet('wireless').catch(() => ({ values: {} })),
 			api.veci('clients').catch(() => ({ clients: [] })),
 			api.veci('securityStatus').catch(() => ({ root_password_set: true }))
 		]);
@@ -39,8 +53,7 @@ export default {
 
 		const uplink = defaultRouteInterface(interfaces);
 		const memory = formatMemory(system.memory || {});
-		const radios = Object.values(wireless || {});
-		const networks = wifiNetworks(wireless);
+		const { radios, networks } = wifiInventory(wireless, wirelessConfig);
 		const clientCount = clients.clients?.length || 0;
 		const model = state.board?.model || state.board?.board_name || 'OpenWrt Router';
 		const boardName = state.board?.board_name || '';
