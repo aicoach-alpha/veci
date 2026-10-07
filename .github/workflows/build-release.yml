@@ -28,7 +28,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
-          version: 9
+          version: 8.15.9
 
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
@@ -115,11 +115,11 @@ jobs:
       - name: Copy package files
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
-          mkdir -p ${{ matrix.sdk_name }}/package/moci
-          sed "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" Makefile > ${{ matrix.sdk_name }}/package/moci/Makefile
-          cp -r dist ${{ matrix.sdk_name }}/package/moci/
-          cp rpcd-acl.json ${{ matrix.sdk_name }}/package/moci/
-          cp -r files ${{ matrix.sdk_name }}/package/moci/
+          mkdir -p ${{ matrix.sdk_name }}/package/veci
+          sed "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" Makefile > ${{ matrix.sdk_name }}/package/veci/Makefile
+          cp -r dist ${{ matrix.sdk_name }}/package/veci/
+          cp rpcd-acl.json ${{ matrix.sdk_name }}/package/veci/
+          cp -r files ${{ matrix.sdk_name }}/package/veci/
 
       - name: Update feeds
         if: steps.cache-sdk.outputs.cache-hit != 'true'
@@ -133,26 +133,26 @@ jobs:
         run: |
           rm -rf bin/packages
           make defconfig
-          make package/moci/compile V=s
+          make package/veci/compile V=s
 
       - name: Find and rename ipk
         id: find_ipk
         working-directory: ${{ matrix.sdk_name }}
         run: |
-          IPK_FILE=$(find bin/packages -name "moci_*.ipk" | head -n 1)
+          IPK_FILE=$(find bin/packages -name "veci_*.ipk" | head -n 1)
           if [ -z "$IPK_FILE" ]; then
             echo "Error: ipk package not found!"
             exit 1
           fi
           VERSION="${{ needs.prepare.outputs.version }}"
-          NEW_NAME="moci_${VERSION}-r1_${{ matrix.arch }}.ipk"
+          NEW_NAME="veci_${VERSION}-r1_${{ matrix.arch }}.ipk"
           mv "$IPK_FILE" "/tmp/$NEW_NAME"
           echo "package_name=$NEW_NAME" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: moci-ipk-${{ matrix.arch }}
+          name: veci-ipk-${{ matrix.arch }}
           path: /tmp/${{ steps.find_ipk.outputs.package_name }}
 
   build-apk:
@@ -218,11 +218,11 @@ jobs:
       - name: Copy package files
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
-          mkdir -p ${{ matrix.sdk_name }}/package/moci
-          sed "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" Makefile > ${{ matrix.sdk_name }}/package/moci/Makefile
-          cp -r dist ${{ matrix.sdk_name }}/package/moci/
-          cp rpcd-acl.json ${{ matrix.sdk_name }}/package/moci/
-          cp -r files ${{ matrix.sdk_name }}/package/moci/
+          mkdir -p ${{ matrix.sdk_name }}/package/veci
+          sed "s/PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" Makefile > ${{ matrix.sdk_name }}/package/veci/Makefile
+          cp -r dist ${{ matrix.sdk_name }}/package/veci/
+          cp rpcd-acl.json ${{ matrix.sdk_name }}/package/veci/
+          cp -r files ${{ matrix.sdk_name }}/package/veci/
 
       - name: Update feeds
         if: steps.cache-sdk.outputs.cache-hit != 'true'
@@ -236,26 +236,26 @@ jobs:
         run: |
           rm -rf bin/packages
           make defconfig
-          make package/moci/compile V=s
+          make package/veci/compile V=s
 
       - name: Find and rename apk
         id: find_apk
         working-directory: ${{ matrix.sdk_name }}
         run: |
-          APK_FILE=$(find bin/packages -name "moci*.apk" | head -n 1)
+          APK_FILE=$(find bin/packages -name "veci*.apk" | head -n 1)
           if [ -z "$APK_FILE" ]; then
             echo "Error: apk package not found!"
             exit 1
           fi
           VERSION="${{ needs.prepare.outputs.version }}"
-          NEW_NAME="moci_${VERSION}-r1_${{ matrix.arch }}.apk"
+          NEW_NAME="veci_${VERSION}-r1_${{ matrix.arch }}.apk"
           mv "$APK_FILE" "/tmp/$NEW_NAME"
           echo "package_name=$NEW_NAME" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: moci-apk-${{ matrix.arch }}
+          name: veci-apk-${{ matrix.arch }}
           path: /tmp/${{ steps.find_apk.outputs.package_name }}
 
   publish:
@@ -271,7 +271,7 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: moci-*
+          pattern: veci-*
           merge-multiple: true
           path: packages/
 

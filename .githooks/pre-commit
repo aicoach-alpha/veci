@@ -1,6 +1,6 @@
 #!/bin/sh
 
-staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(moci/.*\.(js|css|html)|scripts/.*\.js|index\.html)$')
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(veci/.*\.(js|css|html)|scripts/.*\.js|index\.html)$')
 [ -z "$staged" ] && exit 0
 
 if ! pnpm exec prettier --version >/dev/null 2>&1; then

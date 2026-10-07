@@ -1,6 +1,6 @@
 {
-	"moci": {
-		"description": "ACL permissions for MoCI OpenWrt interface",
+	"veci": {
+		"description": "ACL permissions for VeCI OpenWrt interface",
 		"read": {
 			"file": {
 				"/usr/lib/opkg/status": ["read"],
@@ -13,11 +13,11 @@
 				"/etc/hosts": ["read"],
 				"/tmp/firmware.bin": ["read"],
 				"/tmp/backup.tar.gz": ["read"],
-				"/usr/libexec/moci-pkg-call list-present": ["exec"],
-				"/usr/libexec/moci-pkg-call list-installed": ["exec"],
-				"/usr/libexec/moci-pkg-call list-available": ["exec"],
-				"/usr/libexec/moci-pkg-call inspect *": ["exec"],
-				"/usr/libexec/moci-pkg-call feeds": ["exec"],
+				"/usr/libexec/veci-pkg-call list-present": ["exec"],
+				"/usr/libexec/veci-pkg-call list-installed": ["exec"],
+				"/usr/libexec/veci-pkg-call list-available": ["exec"],
+				"/usr/libexec/veci-pkg-call inspect *": ["exec"],
+				"/usr/libexec/veci-pkg-call feeds": ["exec"],
 				"/sbin/logread": ["exec"],
 				"/bin/dmesg": ["exec"],
 				"/bin/ping": ["exec"],
@@ -33,18 +33,18 @@
 				"uci": ["get"],
 				"file": ["read"],
 				"system": ["info", "board"],
-				"moci": ["getDHCPLeases", "getPorts", "getBridges"],
+				"veci": ["getDHCPLeases", "getPorts", "getBridges"],
 				"service": ["list"]
 			},
-			"uci": ["moci"]
+			"uci": ["veci"]
 		},
 		"write": {
 			"file": {
-				"/usr/libexec/moci-pkg-call install *": ["exec"],
-				"/usr/libexec/moci-pkg-call remove *": ["exec"],
-				"/usr/libexec/moci-pkg-call update": ["exec"],
-				"/usr/libexec/moci-pkg-call feed-add *": ["exec"],
-				"/usr/libexec/moci-pkg-call feed-remove *": ["exec"],
+				"/usr/libexec/veci-pkg-call install *": ["exec"],
+				"/usr/libexec/veci-pkg-call remove *": ["exec"],
+				"/usr/libexec/veci-pkg-call update": ["exec"],
+				"/usr/libexec/veci-pkg-call feed-add *": ["exec"],
+				"/usr/libexec/veci-pkg-call feed-remove *": ["exec"],
 				"/usr/bin/etherwake": ["exec"],
 				"/etc/hosts": ["write"],
 				"/etc/crontabs/root": ["write"],
@@ -66,7 +66,7 @@
 				"file": ["write", "exec"],
 				"system": ["reboot"],
 				"network.interface": ["up", "down"],
-				"moci": ["setPassword", "wgGenKey"]
+				"veci": ["setPassword", "wgGenKey"]
 			},
 			"uci": [
 				"network",
@@ -76,7 +76,7 @@
 				"system",
 				"qos",
 				"ddns",
-				"moci"
+				"veci"
 			]
 		}
 	}

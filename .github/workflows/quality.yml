@@ -1,0 +1,62 @@
+name: VeCI Quality
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feat/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
+
+      - name: Build production bundle
+        run: pnpm build
+
+      - name: Verify no plaintext credential persistence
+        run: |
+          if grep -Rni --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist             -E 'saved_credentials|localStorage\.setItem\([^)]*(password|credential)' veci; then
+            echo "Credential persistence pattern found"
+            exit 1
+          fi
+
+      - name: Verify generic hardware identity
+        run: |
+          grep -q "ubusCall('system', 'board'" veci/js/modules/dashboard.js
+          grep -q "boardInfo.model" veci/js/modules/dashboard.js
+          if grep -Rni --exclude-dir=dist -E 'ZBT-WE5927|WE5927-OpenWrt' veci; then
+            echo "Generic VeCI core must not hardcode a router model"
+            exit 1
+          fi
+
+      - name: Bundle size report
+        run: |
+          du -ah dist/veci | sort -h | tail -20
+          find dist/veci -type f -print0 | xargs -0 cat | wc -c

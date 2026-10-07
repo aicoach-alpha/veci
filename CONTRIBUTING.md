@@ -1,6 +1,6 @@
-# Contributing to MoCI
+# Contributing to VeCI
 
-Development guide for the MoCI OpenWrt management interface.
+Development guide for the VeCI OpenWrt management interface.
 
 ---
 
@@ -16,7 +16,7 @@ pnpm dev
 # Auto-deploy to physical router
 pnpm dev:physical 192.168.1.35
 
-# Edit files in moci/ - changes auto-deploy to target
+# Edit files in veci/ - changes auto-deploy to target
 ```
 
 Git hooks live in `.githooks/` and are activated automatically by `pnpm install`
@@ -36,7 +36,7 @@ prettier; it skips silently if prettier is not installed.
 ### File Structure
 
 ```
-moci/
+veci/
 ├── index.html         - UI structure + modals
 ├── app.css            - Dark glassmorphic theme
 ├── js/
@@ -55,17 +55,17 @@ scripts/
 └── quick-start.sh     - Automated setup
 
 files/
-└── moci.config        - UCI feature flag configuration
+└── veci.config        - UCI feature flag configuration
 ```
 
 ### Modular Architecture
 
-MoCI uses ES6 modules for better organization and conditional feature loading:
+VeCI uses ES6 modules for better organization and conditional feature loading:
 
 **Core (`core.js`):**
 - Authentication and session management
 - ubus/UCI API wrappers
-- Feature flag loading from `/etc/config/moci`
+- Feature flag loading from `/etc/config/veci`
 - Module loading and initialization
 - Shared utilities (formatting, toasts, modals)
 
@@ -76,7 +76,7 @@ MoCI uses ES6 modules for better organization and conditional feature loading:
 
 **Feature Flags:**
 
-Edit `/etc/config/moci` to enable/disable features:
+Edit `/etc/config/veci` to enable/disable features:
 
 ```uci
 config ui 'features'
@@ -164,15 +164,15 @@ ssh-keygen -t ed25519 -f ~/.ssh/router
 ssh-copy-id -i ~/.ssh/router root@192.168.1.1
 
 # Deploy initial files
-scp -r moci/* root@192.168.1.1:/www/moci/
+scp -r veci/* root@192.168.1.1:/www/veci/
 
 # Start auto-deploy to your router IP
 pnpm dev:physical 192.168.1.35
 ```
 
 **How auto-deploy works:**
-- Watches `moci/` directory for changes
-- On save, pipes files via SSH to `/www/moci/`
+- Watches `veci/` directory for changes
+- On save, pipes files via SSH to `/www/veci/`
 - Refresh browser to see changes (no router restart needed)
 
 ### Option 2: QEMU VM
@@ -203,7 +203,7 @@ pnpm dev
   - `4443` → `443` (HTTPS)
 
 **Access:**
-- Web UI: `http://localhost:8080/moci/`
+- Web UI: `http://localhost:8080/veci/`
 - SSH: `ssh -p 2222 root@localhost`
 - Default credentials: `root` / (no password)
 
@@ -258,7 +258,7 @@ Deploy to router without auto-watch.
 pnpm run deploy
 
 # Or manual SCP
-scp -r moci/* root@<router-ip>:/www/moci/
+scp -r veci/* root@<router-ip>:/www/veci/
 ```
 
 ---
@@ -267,7 +267,7 @@ scp -r moci/* root@<router-ip>:/www/moci/
 
 ### 1. Add UI Section
 
-Edit `moci/index.html`:
+Edit `veci/index.html`:
 
 ```html
 <!-- Add tab button -->
@@ -284,7 +284,7 @@ Edit `moci/index.html`:
 
 ### 2. Add Logic
 
-Edit `moci/app.js`:
+Edit `veci/app.js`:
 
 ```javascript
 async loadMyFeature() {
@@ -307,7 +307,7 @@ showSection(section) {
 
 ### 3. Add Styling
 
-Edit `moci/app.css`:
+Edit `veci/app.css`:
 
 ```css
 #my-feature-section {
@@ -369,11 +369,11 @@ logread -f  # Follow system log
 ### Bundle Size
 
 ```bash
-wc -c moci/*
+wc -c veci/*
 
-gzip -c moci/index.html | wc -c
-gzip -c moci/app.js | wc -c
-gzip -c moci/app.css | wc -c
+gzip -c veci/index.html | wc -c
+gzip -c veci/app.js | wc -c
+gzip -c veci/app.css | wc -c
 ```
 
 ### Router Impact
@@ -453,7 +453,7 @@ cat scripts/watch.js
 ## Release Process
 
 1. Test on physical hardware
-2. Check bundle size (`gzip -c moci/* | wc -c`)
+2. Check bundle size (`gzip -c veci/* | wc -c`)
 3. Update version in `package.json`
 4. Create git tag: `git tag v1.x.x`
 5. Push: `git push origin main --tags`

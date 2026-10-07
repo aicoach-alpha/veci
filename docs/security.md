@@ -1,67 +1,48 @@
-# MoCI Add-on Security Model
+# VeCI application security model
 
-The add-on system is a **supply-chain trust model, not a runtime sandbox**. This
-document states plainly what is enforced and what is not.
+VeCI applications are privileged router-administration code. The application
+system is therefore a **supply-chain trust model, not a browser sandbox**.
 
-## Trust model
+The project-wide security policy is in [../SECURITY.md](../SECURITY.md).
 
-A trusted add-on is a signed package from a MoCI feed. Trust reduces to:
+## Current default
 
-1. **Feed signature**: `opkg`/`apk` verify the `usign`-signed package index and
-   per-package SHA256 against a key installed on the device. This is the real
-   integrity control: add-on code is signed, not pulled from a mutable URL.
-2. **Install-time consent**: `moci-pkg-call inspect` extracts the package's
-   actual `acl.d` fragment and shows it before install. Consent matches the bytes
-   that get applied.
+The public `veci-app-*` feed is **disabled by default** while VeCI is in
+development. VeCI does not ship a copied upstream signing key as if it were a
+VeCI trust root.
 
-The signature proves **provenance, not safety**. A signed add-on is still
-arbitrary code.
+A future public feed must have a VeCI-controlled signing key, documented key
+rotation, checksums, and a reproducible package pipeline before it is enabled by
+default.
 
-## Enforced vs. advisory
+## Authentication
 
-**Enforced**
-- The feed signature and package checksums.
-- Core's exec surface: the web session can only invoke `moci-pkg-call`, which is
-  namespace-locked to `moci-app-*` and rejects path traversal / injection.
-- Core no longer writes `acl.d` or reloads rpcd: the old browser-driven
-  privilege-grant primitive is gone.
+VeCI uses an OpenWrt ubus session. The router password is not stored by VeCI.
+Only the ubus session token is retained in browser `sessionStorage`.
 
-**Advisory (NOT enforced today)**
-- **Per-add-on ACLs do not confine anything at runtime.** MoCI authenticates as
-  root, and rpcd's root login holds `read */write *`. So the session has every
-  ACL regardless of `moci.json` or any add-on fragment. An installed add-on's
-  client JS runs with full root-equivalent ubus access, and add-ons are not
-  isolated from each other or from core. The ACL fragment documents intent and
-  provides least-privilege **only** if MoCI runs as a non-root user.
+## Application privilege
 
-## Residual risk
+If the administrator logs in as `root`, JavaScript running inside that session
+can potentially exercise root-authorized ubus operations. An ACL declaration
+therefore documents intended permissions but does not magically sandbox
+client-side code from a root session.
 
-- **Single trust root.** One feed signing key. Compromise it and malicious
-  add-ons install with valid signatures and run as root. Store it offline/HSM,
-  plan rotation, and keep a revocation list (already-installed add-ons are not
-  auto-removed when dropped from the feed).
-- **Add-ons are root code with a daemon.** No namespaces/seccomp/cap-drop by
-  default. Daemons should jail themselves via procd (`procd_set_param seccomp`,
-  `procd_set_param user`).
-- **The web server runs as root** (uhttpd; lighttpd on Turris must run as root
-  for the `ubus.cgi` bridge). Any XSS in the SPA or an add-on → root via the
-  session. Always `escapeHtml` add-on-controlled strings.
-- **Pre-auth bridge surface.** The Turris `ubus.cgi` bridge `eval`s
-  `jsonfilter` output on unauthenticated POST bodies: audit it as a distinct
-  RCE-class review.
-- **Credential storage.** MoCI persists plaintext credentials in `localStorage`
-  (`saved_credentials`); XSS exfiltrates real credentials, not just a token.
+For that reason:
 
-## Hardening roadmap
+- remote JavaScript is not treated as a safe extension mechanism;
+- signed package provenance is required for the future public feed;
+- server-side helpers should expose narrow rpcd methods;
+- heavy or privileged daemons should use normal OpenWrt procd hardening where
+  possible;
+- application UI data must be escaped before insertion into HTML.
 
-1. **Dedicated non-root `moci` rpcd user**: the change that turns advisory ACLs
-   into enforced ones. MoCI authenticates as a `moci` user mapped only to the
-   `moci` group; add-on approval extends that user's group memberships to the
-   add-on's scope. Treat as a prerequisite, not optional.
-2. **Feed-key hardening**: offline/HSM signing, rotation, revocation list, and
-   ideally per-author signatures so one key compromise is not total.
-3. **Drop web-server root** where possible; on Turris grant the `http` user a
-   scoped ubus ACL instead of running lighttpd as root.
-4. **Audit the `ubus.cgi` bridge** (`eval`, shell quoting, pre-auth exposure).
-5. **Stop persisting plaintext credentials**; rely on the session token with a
-   shorter TTL.
+## Sideloading
+
+Development sideloading is for developers only and remains opt-in. It must never
+be presented as equivalent to a signed package.
+
+## Future hardening
+
+The long-term model is a dedicated non-root VeCI rpcd identity with enforceable
+ACL groups for routine administration, plus explicit privilege elevation for
+operations that truly require root.

@@ -1,0 +1,10 @@
+{
+	"veci-app-pinglog": {
+		"description": "VeCI app Ping Log: read latency history",
+		"read": {
+			"file": {
+				"/tmp/veci-pinglog.log": ["read"]
+			}
+		}
+	}
+}

@@ -31,10 +31,10 @@ if (target === 'qemu') {
 	targetName = `Physical router (${target})`;
 }
 
-console.log(`Watching for changes in moci/...`);
+console.log(`Watching for changes in veci/...`);
 console.log(`Target: ${targetName}\n`);
 
-const watcher = chokidar.watch('moci', {
+const watcher = chokidar.watch('veci', {
 	persistent: true,
 	ignoreInitial: true,
 	awaitWriteFinish: {
@@ -70,19 +70,19 @@ function deploy() {
 	try {
 		console.log(`Deploying to ${targetName}...`);
 
-		execSync(`${SSH} "mkdir -p /www/moci/js/modules"`, { stdio: 'pipe' });
+		execSync(`${SSH} "mkdir -p /www/veci/js/modules"`, { stdio: 'pipe' });
 
-		execSync(`cat moci/index.html | ${SSH} "cat > /www/moci/index.html"`, { stdio: 'pipe' });
-		execSync(`cat moci/app.css | ${SSH} "cat > /www/moci/app.css"`, { stdio: 'pipe' });
+		execSync(`cat veci/index.html | ${SSH} "cat > /www/veci/index.html"`, { stdio: 'pipe' });
+		execSync(`cat veci/app.css | ${SSH} "cat > /www/veci/app.css"`, { stdio: 'pipe' });
 
-		execSync(`cat moci/js/core.js | ${SSH} "cat > /www/moci/js/core.js"`, { stdio: 'pipe' });
-		execSync(`cat moci/js/modules/dashboard.js | ${SSH} "cat > /www/moci/js/modules/dashboard.js"`, {
+		execSync(`cat veci/js/core.js | ${SSH} "cat > /www/veci/js/core.js"`, { stdio: 'pipe' });
+		execSync(`cat veci/js/modules/dashboard.js | ${SSH} "cat > /www/veci/js/modules/dashboard.js"`, {
 			stdio: 'pipe'
 		});
-		execSync(`cat moci/js/modules/network.js | ${SSH} "cat > /www/moci/js/modules/network.js"`, {
+		execSync(`cat veci/js/modules/network.js | ${SSH} "cat > /www/veci/js/modules/network.js"`, {
 			stdio: 'pipe'
 		});
-		execSync(`cat moci/js/modules/system.js | ${SSH} "cat > /www/moci/js/modules/system.js"`, {
+		execSync(`cat veci/js/modules/system.js | ${SSH} "cat > /www/veci/js/modules/system.js"`, {
 			stdio: 'pipe'
 		});
 
@@ -96,7 +96,7 @@ function deployACL() {
 	try {
 		console.log(`Deploying ACL to ${targetName}...`);
 
-		execSync(`cat rpcd-acl.json | ${SSH} "cat > /usr/share/rpcd/acl.d/moci.json"`, { stdio: 'pipe' });
+		execSync(`cat rpcd-acl.json | ${SSH} "cat > /usr/share/rpcd/acl.d/veci.json"`, { stdio: 'pipe' });
 		execSync(`${SSH} "/etc/init.d/rpcd restart"`, { stdio: 'pipe' });
 
 		console.log('ACL deployed and rpcd restarted\n');
@@ -105,4 +105,4 @@ function deployACL() {
 	}
 }
 
-console.log('Ready. Save files in moci/ or rpcd-acl.json to trigger deploy.');
+console.log('Ready. Save files in veci/ or rpcd-acl.json to trigger deploy.');

@@ -1,23 +1,23 @@
-# MoCI Add-ons
+# VeCI Add-ons
 
-An add-on is a client-side ES module loaded into the MoCI SPA, optionally backed
+An add-on is a client-side ES module loaded into the VeCI SPA, optionally backed
 by a daemon and an rpcd ACL. Two distribution paths:
 
-- **Package (trusted)**: a signed `opkg`/`apk` package in a MoCI feed. Installs
+- **Package (trusted)**: a signed `opkg`/`apk` package in a VeCI feed. Installs
   via the package manager; its ACL and any daemon ship inside the package.
 - **Sideload (dev, untrusted)**: fetched from a GitHub URL straight into the
   webroot. Off by default, gets **no** router permissions, and requires the dev
-  ACL (`files/moci-dev-sideload.json`) installed by hand. Use only while
+  ACL (`files/veci-dev-sideload.json`) installed by hand. Use only while
   developing.
 
-> Security note: an installed add-on runs in the MoCI session, which is root.
+> Security note: an installed add-on runs in the VeCI session, which is root.
 > A signature proves **who** published an add-on, not that it is **safe**.
 > Only install add-ons from sources you trust. See `docs/security.md`.
 
 ## Anatomy
 
 ```
-moci-app-<id>/
+veci-app-<id>/
   manifest.json          required
   addon.js               required (the module; field "entry")
   style.css              optional (field "css")
@@ -27,8 +27,8 @@ moci-app-<id>/
   Makefile               required to build a package
 ```
 
-Package name convention: `moci-app-<id>`, installed to
-`/www/moci/js/addons/<id>/`.
+Package name convention: `veci-app-<id>`, installed to
+`/www/veci/js/addons/<id>/`.
 
 ## manifest.json
 
@@ -113,93 +113,86 @@ Return contributions from `getExtensions()`:
 
 If the add-on calls ubus/uci/file operations beyond what core exposes, ship an
 rpcd ACL fragment as `files/acl.json`, installed to
-`/usr/share/rpcd/acl.d/moci-app-<id>.json`:
+`/usr/share/rpcd/acl.d/veci-app-<id>.json`:
 
 ```json
 {
-  "moci-app-pinglog": {
-    "description": "MoCI add-on Ping Log: read latency history",
-    "read": { "file": { "/tmp/moci-pinglog.log": ["read"] } }
+  "veci-app-pinglog": {
+    "description": "VeCI add-on Ping Log: read latency history",
+    "read": { "file": { "/tmp/veci-pinglog.log": ["read"] } }
   }
 }
 ```
 
-`moci-pkg-call inspect` extracts this exact file from the package and shows it on
+`veci-pkg-call inspect` extracts this exact file from the package and shows it on
 the install screen, so consent matches what is applied. (Runtime is root, so this
 is least-privilege documentation, not a sandbox: see `docs/security.md`.)
 
 ## Packaging
 
-Minimal client-only package: see `examples/moci-app-speedtest/`:
+Minimal client-only package: see `examples/veci-app-speedtest/`:
 
 ```make
 include $(TOPDIR)/rules.mk
-PKG_NAME:=moci-app-speedtest
+PKG_NAME:=veci-app-speedtest
 PKG_VERSION:=1.0.0
 PKG_RELEASE:=1
 include $(INCLUDE_DIR)/package.mk
 
-define Package/moci-app-speedtest
+define Package/veci-app-speedtest
   SECTION:=admin
   CATEGORY:=Administration
-  SUBMENU:=MoCI Add-ons
-  TITLE:=MoCI Add-on: Speedtest
+  SUBMENU:=VeCI Add-ons
+  TITLE:=VeCI Add-on: Speedtest
   PKGARCH:=all
-  DEPENDS:=+moci
+  DEPENDS:=+veci
 endef
 
 define Build/Compile
 endef
 
-define Package/moci-app-speedtest/install
-	$(INSTALL_DIR) $(1)/www/moci/js/addons/speedtest
-	$(INSTALL_DATA) ./files/manifest.json $(1)/www/moci/js/addons/speedtest/manifest.json
-	$(INSTALL_DATA) ./files/addon.js $(1)/www/moci/js/addons/speedtest/addon.js
-	$(INSTALL_DATA) ./files/style.css $(1)/www/moci/js/addons/speedtest/style.css
+define Package/veci-app-speedtest/install
+	$(INSTALL_DIR) $(1)/www/veci/js/addons/speedtest
+	$(INSTALL_DATA) ./files/manifest.json $(1)/www/veci/js/addons/speedtest/manifest.json
+	$(INSTALL_DATA) ./files/addon.js $(1)/www/veci/js/addons/speedtest/addon.js
+	$(INSTALL_DATA) ./files/style.css $(1)/www/veci/js/addons/speedtest/style.css
 endef
 
-$(eval $(call BuildPackage,moci-app-speedtest))
+$(eval $(call BuildPackage,veci-app-speedtest))
 ```
 
 For a daemon + ACL package (init script, ACL fragment, and a `postinst` that
 runs `/etc/init.d/rpcd reload` so the new ACL takes effect), see
-`examples/moci-app-pinglog/`. The package reloads rpcd itself; MoCI core never
+`examples/veci-app-pinglog/`. The package reloads rpcd itself; VeCI core never
 holds that privilege.
 
 ## Feeds
 
-The official add-on feed lives at
-`https://hudsongraeme.github.io/moci-feed` (the
-[moci-feed](https://github.com/HudsonGraeme/moci-feed) repository, served by
-GitHub Pages, updated independently of MoCI releases). The `moci` package
-ships its usign public key (`files/moci-feed.pub` →
-`/etc/opkg/keys/bc0c5f67deb5edb8`) and a default `/etc/opkg/moci-apps.conf`
-pointing at it, so Browse works out of the box.
+VeCI does **not** ship an enabled public application feed yet.
 
-Feeds are managed from Add-ons → Browse → Feeds, or via
-`moci-pkg-call feeds | feed-add <name> <url> | feed-remove <name>`. URLs must
-be HTTPS. A third-party feed's usign public key must be installed as
-`/etc/opkg/keys/<fingerprint>` over SSH before its packages pass signature
-verification — MoCI deliberately has no ACL to write trust roots from the web
-UI.
+The upstream MoCI feed key and feed URL are deliberately not rebranded or
+reused. A VeCI feed will be enabled only after VeCI has its own signing key,
+release process, key-rotation policy, and package compatibility checks.
+
+Third-party feeds can still be configured manually by advanced users. Their
+trust keys must be installed out of band; VeCI does not grant itself permission
+to create a new trust root from an arbitrary web page.
 
 ## Publishing to a feed
 
-`scripts/build-app-feed.sh` builds the example add-on packages and an `opkg`
-index into `feed/` without an SDK, then signs the index with
-`$MOCI_FEED_KEY` (default `~/.usign/moci-feed.sec`). For your own feed:
+The repository keeps a development feed-building script as engineering
+infrastructure. Before any official VeCI feed is published it must:
 
-1. Build the `.ipk`/`.apk` (SDK or the script).
-2. Generate the `Packages` index and **sign it with `usign`**; serve `Packages`,
-   `Packages.gz`, `Packages.sig` plus the `.ipk`s over HTTPS.
-3. Install the public key on devices as `/etc/opkg/keys/<fingerprint>`.
-4. Register the feed in Add-ons → Browse → Feeds.
+1. Build the `.ipk` / `.apk` packages reproducibly.
+2. Generate package indexes and checksums.
+3. Sign the index with a VeCI-controlled `usign` key.
+4. Publish the corresponding public key and fingerprint through a documented
+   release channel.
+5. Test installation on supported OpenWrt releases.
 
 ## Installing
 
-- **UI (trusted):** Add-ons → Browse → Install. The install screen shows the
-  add-on's real ACL before you confirm.
-- **CLI:** `opkg install moci-app-<id>` (or `apk add`).
-- **Dev sideload (untrusted):** install `files/moci-dev-sideload.json` into
-  `/usr/share/rpcd/acl.d/` and `/etc/init.d/rpcd reload`, then Add-ons →
-  Install from URL. The add-on gets zero router permissions.
+- **Signed package:** preferred once a VeCI or trusted third-party feed exists.
+- **CLI package:** `opkg install veci-app-<id>` or the OpenWrt 25.12+ `apk`
+  equivalent.
+- **Dev sideload:** opt-in, untrusted, and for development only.

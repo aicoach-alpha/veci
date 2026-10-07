@@ -22,16 +22,16 @@ stage_files() {
 	data="$2"
 	files="$EX/$name/files"
 	case "$name" in
-		moci-app-speedtest)
-			mkdir -p "$data/www/moci/js/addons/speedtest"
-			cp "$files/manifest.json" "$files/addon.js" "$files/style.css" "$data/www/moci/js/addons/speedtest/"
+		veci-app-speedtest)
+			mkdir -p "$data/www/veci/js/addons/speedtest"
+			cp "$files/manifest.json" "$files/addon.js" "$files/style.css" "$data/www/veci/js/addons/speedtest/"
 			;;
-		moci-app-pinglog)
-			mkdir -p "$data/www/moci/js/addons/pinglog" "$data/usr/bin" "$data/etc/init.d" "$data/usr/share/rpcd/acl.d"
-			cp "$files/manifest.json" "$files/addon.js" "$data/www/moci/js/addons/pinglog/"
-			install -m 0755 "$files/moci-pinglog" "$data/usr/bin/moci-pinglog"
-			install -m 0755 "$files/pinglog.init" "$data/etc/init.d/moci-pinglog"
-			cp "$files/acl.json" "$data/usr/share/rpcd/acl.d/moci-app-pinglog.json"
+		veci-app-pinglog)
+			mkdir -p "$data/www/veci/js/addons/pinglog" "$data/usr/bin" "$data/etc/init.d" "$data/usr/share/rpcd/acl.d"
+			cp "$files/manifest.json" "$files/addon.js" "$data/www/veci/js/addons/pinglog/"
+			install -m 0755 "$files/veci-pinglog" "$data/usr/bin/veci-pinglog"
+			install -m 0755 "$files/pinglog.init" "$data/etc/init.d/veci-pinglog"
+			cp "$files/acl.json" "$data/usr/share/rpcd/acl.d/veci-app-pinglog.json"
 			;;
 	esac
 }
@@ -39,20 +39,20 @@ stage_files() {
 write_control_scripts() {
 	name=$1
 	ctrl="$2"
-	[ "$name" = "moci-app-pinglog" ] || return 0
+	[ "$name" = "veci-app-pinglog" ] || return 0
 	cat > "$ctrl/postinst" <<'EOF'
 #!/bin/sh
 [ -n "${IPKG_INSTROOT}" ] || {
-	/etc/init.d/moci-pinglog enable
-	/etc/init.d/moci-pinglog start
+	/etc/init.d/veci-pinglog enable
+	/etc/init.d/veci-pinglog start
 	/etc/init.d/rpcd reload
 }
 EOF
 	cat > "$ctrl/prerm" <<'EOF'
 #!/bin/sh
 [ -n "${IPKG_INSTROOT}" ] || {
-	/etc/init.d/moci-pinglog stop
-	/etc/init.d/moci-pinglog disable
+	/etc/init.d/veci-pinglog stop
+	/etc/init.d/veci-pinglog disable
 }
 EOF
 	cat > "$ctrl/postrm" <<'EOF'
@@ -126,14 +126,14 @@ EOF
 
 PACKAGES="$OUT/Packages"
 : > "$PACKAGES"
-for name in moci-app-speedtest moci-app-pinglog; do
+for name in veci-app-speedtest veci-app-pinglog; do
 	build_ipk "$name"
 	index_entry "$name" >> "$PACKAGES"
 done
 
 gzip -kn -f "$PACKAGES"
 
-KEY="${MOCI_FEED_KEY:-$HOME/.usign/moci-feed.sec}"
+KEY="${VECI_FEED_KEY:-$HOME/.usign/veci-feed.sec}"
 USIGN=$(command -v usign || true)
 [ -n "$USIGN" ] || [ ! -x "$HOME/.local/bin/usign" ] || USIGN="$HOME/.local/bin/usign"
 if [ -n "$USIGN" ] && [ -f "$KEY" ]; then
@@ -146,7 +146,7 @@ fi
 echo "feed index: $PACKAGES(.gz)"
 ls -l "$OUT"
 
-REPO="${MOCI_FEED_REPO:-$ROOT/../moci-feed}"
+REPO="${VECI_FEED_REPO:-$ROOT/../veci-feed}"
 if [ -d "$REPO/.git" ]; then
 	cp "$OUT"/*.ipk "$PACKAGES" "$PACKAGES.gz" "$REPO/"
 	rm -f "$REPO/Packages.sig"
