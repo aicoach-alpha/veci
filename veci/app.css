@@ -1676,3 +1676,130 @@ a {
 		animation-duration: 0.01ms !important;
 	}
 }
+
+/* Native Wi-Fi editor */
+.wifi-card-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 16px;
+	padding-top: 14px;
+	border-top: 1px solid #edf2f7;
+}
+
+.readonly-note {
+	color: var(--text-muted);
+	font-size: 0.7rem;
+}
+
+.editor-panel {
+	margin-top: 20px;
+	scroll-margin-top: 94px;
+}
+
+.editor-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.editor-grid .field {
+	margin: 0;
+}
+
+.editor-grid .field-wide {
+	grid-column: 1 / -1;
+}
+
+.field select {
+	width: 100%;
+	min-height: 46px;
+	padding: 0 12px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: #fff;
+	color: var(--text-primary);
+}
+
+.field select:focus {
+	border-color: var(--brand-primary);
+	outline: 0;
+	box-shadow: 0 0 0 3px rgba(23, 105, 170, 0.13);
+}
+
+.field small {
+	margin-top: -1px;
+	color: var(--text-muted);
+	font-size: 0.68rem;
+	line-height: 1.45;
+}
+
+.toggle-grid {
+	display: grid;
+	gap: 10px;
+	margin-top: 20px;
+}
+
+.toggle-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 18px;
+	padding: 13px 14px;
+	border: 1px solid #e4edf4;
+	border-radius: 13px;
+	background: #fbfdff;
+}
+
+.toggle-row strong,
+.toggle-row span {
+	display: block;
+}
+
+.toggle-row strong {
+	font-size: 0.8rem;
+}
+
+.toggle-row span {
+	margin-top: 3px;
+	color: var(--text-secondary);
+	font-size: 0.68rem;
+	line-height: 1.45;
+}
+
+.toggle-row input[type='checkbox'] {
+	width: 20px;
+	height: 20px;
+	flex: 0 0 auto;
+	accent-color: var(--brand-primary);
+}
+
+.editor-warning {
+	margin-top: 18px;
+	padding: 12px 14px;
+	border: 1px solid #fee7c4;
+	border-radius: 12px;
+	background: #fffcf5;
+	color: #8a5d2d;
+	font-size: 0.72rem;
+	line-height: 1.5;
+}
+
+.editor-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 18px;
+}
+
+@media (max-width: 620px) {
+	.editor-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.editor-grid .field-wide {
+		grid-column: auto;
+	}
+
+	.toggle-row {
+		align-items: flex-start;
+	}
+}

@@ -17,7 +17,7 @@
 				"system": ["reboot"],
 				"network.interface.*": ["up", "down"],
 				"uci": ["set", "add", "delete", "commit"],
-				"veci": ["serviceAction"]
+				"veci": ["serviceAction", "wifiReload"]
 			},
 			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		}

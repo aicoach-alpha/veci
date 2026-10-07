@@ -23,7 +23,7 @@ VeCI is not a LuCI theme. It is its own frontend and its own OpenWrt package.
 | --- | --- |
 | Home | Router identity, Internet status, Wi-Fi count, DHCP clients, uptime and memory |
 | Internet | Interface status, addresses, protocol, connect/disconnect |
-| Wi-Fi | Radio/SSID discovery and operational status |
+| Wi-Fi | Radio/SSID discovery plus native SSID, security, visibility, enable/disable and client-isolation editing |
 | Devices | DHCP client inventory |
 | Security | Firewall zones, rules and redirect summary |
 | Network | Interfaces, bridges and physical-port inventory |

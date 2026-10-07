@@ -13,7 +13,7 @@
 
 ## v0.3 — everyday router workflows
 
-- Wi-Fi edit/create workflow with safe WPA2/WPA3 defaults.
+- Wi-Fi create workflow with safe WPA2/WPA3 defaults. (Existing SSID/security editing is implemented.)
 - Guest Wi-Fi wizard.
 - Friendly connected-device naming.
 - Static DHCP reservation workflow.

@@ -121,9 +121,21 @@ method_service_action() {
 	fi
 }
 
+method_wifi_reload() {
+	if ! command -v wifi >/dev/null 2>&1; then
+		printf '{ "ok": false, "error": "wifi_command_not_found" }\n'
+		return
+	fi
+	if wifi reload >/dev/null 2>&1; then
+		printf '{ "ok": true }\n'
+	else
+		printf '{ "ok": false, "error": "wifi_reload_failed" }\n'
+	fi
+}
+
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "serviceAction": { "service": "str", "action": "str" } }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -132,6 +144,7 @@ case "$1" in
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;
 			serviceAction) method_service_action ;;
+			wifiReload) method_wifi_reload ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
 		esac
 		;;

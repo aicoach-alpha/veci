@@ -11,7 +11,8 @@ When LuCI is installed, the **Expert** entry remains available until the matchin
 | Interface up/down | Yes | Yes | Ready |
 | Full interface editor | Partial | Yes | Planned |
 | Wi-Fi SSID/radio status | Yes | Yes | Ready |
-| Wi-Fi create/edit/delete | Partial | Yes | Planned |
+| Wi-Fi SSID/security edit | Yes | Yes | Ready |
+| Wi-Fi create/delete | No | Yes | Planned |
 | DHCP client list | Yes | Yes | Ready |
 | Static leases | No | Yes | Planned |
 | Firewall zone overview | Yes | Yes | Ready |
