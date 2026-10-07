@@ -1,4 +1,4 @@
-import { badge, escapeHtml } from '../lib/dom.js';
+import { badge, escapeHtml, setBusy } from '../lib/dom.js';
 import { formatBytes, formatDuration, formatMemory, firstAddress } from '../lib/format.js';
 import { icon } from '../lib/icons.js';
 
@@ -23,12 +23,13 @@ export default {
 	eyebrow: 'OVERVIEW',
 	icon: 'home',
 
-	async render({ api, state, root, navigate }) {
-		const [system, interfacesResult, wireless, clients] = await Promise.all([
+	async render({ api, state, root, navigate, toast }) {
+		const [system, interfacesResult, wireless, clients, security] = await Promise.all([
 			api.systemInfo(),
 			api.interfaces(),
 			api.wirelessStatus().catch(() => ({})),
-			api.veci('clients').catch(() => ({ clients: [] }))
+			api.veci('clients').catch(() => ({ clients: [] })),
+			api.veci('securityStatus').catch(() => ({ root_password_set: true }))
 		]);
 
 		const interfaces = interfacesResult.interface || [];
@@ -46,6 +47,25 @@ export default {
 		const firmware = state.board?.release?.description || state.board?.release?.version || 'OpenWrt';
 
 		root.innerHTML = `
+			${
+				security.root_password_set === false
+					? `
+						<section class="setup-alert" id="admin-password-setup">
+							<div class="setup-alert-icon">!</div>
+							<div class="setup-alert-copy">
+								<p class="eyebrow">SECURITY SETUP</p>
+								<h2>Set an administrator password</h2>
+								<p>This router currently accepts the root account without a password. Create one before using the router beyond initial setup.</p>
+								<form id="admin-password-form" class="setup-password-form">
+									<label class="field"><span>New password</span><input id="admin-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required /></label>
+									<label class="field"><span>Confirm password</span><input id="admin-password-confirm" type="password" minlength="8" maxlength="72" autocomplete="new-password" required /></label>
+									<button id="admin-password-save" class="button button-primary" type="submit">Set admin password</button>
+								</form>
+							</div>
+						</section>
+					`
+					: ''
+			}
 			<section class="hero-grid">
 				<article class="hero-card hero-primary">
 					<div class="hero-copy">
@@ -124,6 +144,42 @@ export default {
 				</article>
 			</section>
 		`;
+
+		const passwordForm = root.querySelector('#admin-password-form');
+		passwordForm?.addEventListener('submit', async event => {
+			event.preventDefault();
+			const password = root.querySelector('#admin-password').value;
+			const confirmation = root.querySelector('#admin-password-confirm').value;
+			const button = root.querySelector('#admin-password-save');
+
+			if (password.length < 8 || password.length > 72) {
+				toast('Administrator password must be 8–72 characters.', 'error');
+				return;
+			}
+			if (password !== confirmation) {
+				toast('Password confirmation does not match.', 'error');
+				return;
+			}
+
+			setBusy(button, true, 'Saving…');
+			try {
+				const result = await api.veci('setAdminPassword', { password });
+				if (result.ok === false && result.error === 'password_already_set') {
+					root.querySelector('#admin-password-setup')?.remove();
+					toast('Administrator password is already configured. Use Expert / LuCI to change it.', 'info');
+					return;
+				}
+				if (result.ok === false) throw new Error(result.error || 'Password change failed');
+				root.querySelector('#admin-password').value = '';
+				root.querySelector('#admin-password-confirm').value = '';
+				root.querySelector('#admin-password-setup')?.remove();
+				toast('Administrator password set.', 'success');
+			} catch (error) {
+				toast(error.message || 'Could not set administrator password.', 'error');
+			} finally {
+				setBusy(button, false);
+			}
+		});
 
 		root.querySelectorAll('[data-go]').forEach(button =>
 			button.addEventListener('click', () => navigate(button.dataset.go))
