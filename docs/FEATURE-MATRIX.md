@@ -8,7 +8,7 @@ Until a row reaches **Native**, the firmware keeps LuCI available through **Expe
 | --- | --- | --- | --- |
 | Router identity | **Native** | Live model, board, firmware, kernel from `system.board` | — |
 | Home / health | **Native** | Internet state, Wi-Fi count, DHCP client count, RAM, uptime | Detailed LuCI status remains available |
-| Internet overview | **Native** | Interfaces, protocol, device, address, connect/disconnect | Protocol/IP/DNS editing still Expert |
+| Internet overview | **Native** | Interfaces, protocol, device, address, connect/disconnect, DHCP/static IPv4 and DNS editing for normal uplinks | Cellular uplinks stay on the Cellular page; unusual protocols remain Expert |
 | Cellular | **Native when provider exists** | Signal, operator, SIM, data address, reconnect, SIM switching | Modem-specific diagnostics and uncommon AT controls stay device-specific |
 | Wi-Fi SSID | **Native** | SSID, WPA2/WPA3 personal security, password update, enable/disable, hidden flag, client isolation | — |
 | Guest Wi-Fi | **Native** | Isolated guest SSID, dedicated DHCP/firewall zone, Internet-only forwarding, safe removal of VeCI-owned sections | Complex multi-zone/custom VLAN guest layouts stay Expert |

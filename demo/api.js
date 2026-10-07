@@ -50,6 +50,15 @@ const state = {
 			route: [{ target: '192.168.1.0', mask: 24 }]
 		},
 		{
+			interface: 'wan',
+			up: false,
+			proto: 'dhcp',
+			device: 'eth0.2',
+			l3_device: 'eth0.2',
+			'ipv4-address': [],
+			route: []
+		},
+		{
 			interface: 'lte',
 			up: true,
 			proto: 'dhcp',
@@ -82,6 +91,11 @@ const state = {
 		}
 	},
 	uci: {
+		network: {
+			lan: { '.type': 'interface', proto: 'static', device: 'br-lan', ipaddr: '192.168.1.1', netmask: '255.255.255.0' },
+			wan: { '.type': 'interface', proto: 'dhcp', device: 'eth0.2', peerdns: '1' },
+			lte: { '.type': 'interface', proto: 'dhcp', device: 'usb0', metric: '5', peerdns: '0', dns: ['94.140.14.14', '94.140.15.15'] }
+		},
 		wireless: {
 			radio0: {
 				'.type': 'wifi-device',
@@ -136,7 +150,7 @@ const state = {
 			wan: {
 				'.type': 'zone',
 				name: 'wan',
-				network: ['lte'],
+				network: ['wan', 'lte'],
 				input: 'REJECT',
 				output: 'ACCEPT',
 				forward: 'REJECT',
