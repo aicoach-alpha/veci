@@ -2,61 +2,49 @@ name: VeCI Quality
 
 on:
   push:
-    branches:
-      - main
-      - dev
-      - 'feat/**'
+    branches: [main, dev]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  quality:
+  source:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 8.15.9
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Format check
-        run: pnpm format:check
-
-      - name: Lint
-        run: pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
-
-      - name: Build production bundle
-        run: pnpm build
-
-      - name: Verify no plaintext credential persistence
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
+      - run: pnpm build
+      - name: Verify VeCI source boundary
         run: |
-          if grep -Rni --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist             -E 'saved_credentials|localStorage\.setItem\([^)]*(password|credential)' veci; then
-            echo "Credential persistence pattern found"
+          test -f veci/js/app.js
+          test -d veci/js/pages
+          test ! -e veci/js/core.js
+          test ! -d veci/js/modules
+          test ! -d examples
+      - name: Verify no router-model hardcoding
+        run: |
+          if grep -Rni -E 'ZBT-WE5927|WE5927-OpenWrt|WE2825-2SIM' veci; then
+            echo "Generic VeCI core must discover hardware at runtime."
             exit 1
           fi
-
-      - name: Verify generic hardware identity
+      - name: Verify no administrator password persistence
         run: |
-          grep -q "ubusCall('system', 'board'" veci/js/modules/dashboard.js
-          grep -q "boardInfo.model" veci/js/modules/dashboard.js
-          if grep -Rni --exclude-dir=dist -E 'ZBT-WE5927|WE5927-OpenWrt' veci; then
-            echo "Generic VeCI core must not hardcode a router model"
+          if grep -Rni -E 'saved_credentials|localStorage.*(password|credential)' veci; then
+            echo "Password persistence pattern found."
             exit 1
           fi
-
-      - name: Bundle size report
+      - name: Check RPC helper syntax
+        run: sh -n files/rpcd-veci
+      - name: Bundle size
         run: |
-          du -ah dist/veci | sort -h | tail -20
-          find dist/veci -type f -print0 | xargs -0 cat | wc -c
+          du -sh dist/veci
+          find dist/veci -type f -printf '%s\n' | awk '{ total += $1 } END { print "bundle_bytes=" total }'

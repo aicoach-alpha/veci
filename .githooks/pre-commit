@@ -1,12 +1,9 @@
 #!/bin/sh
+set -eu
 
-staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(veci/.*\.(js|css|html)|scripts/.*\.js|index\.html)$')
-[ -z "$staged" ] && exit 0
-
-if ! pnpm exec prettier --version >/dev/null 2>&1; then
-	echo "pre-commit: prettier unavailable, skipping format" >&2
-	exit 0
+if command -v pnpm >/dev/null 2>&1; then
+	pnpm format:check
+	pnpm exec eslint veci scripts eslint.config.js --max-warnings=0
+else
+	echo "VeCI pre-commit: pnpm is not installed; CI will run the quality gate." >&2
 fi
-
-printf '%s\n' "$staged" | tr '\n' '\0' | xargs -0 pnpm exec prettier --write
-printf '%s\n' "$staged" | tr '\n' '\0' | xargs -0 git add

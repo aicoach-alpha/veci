@@ -1,33 +1,58 @@
 # VeCI architecture
 
-## Product boundary
+VeCI is an OpenWrt administration frontend, not a theme layer over another UI.
 
-VeCI is a presentation and administration layer over OpenWrt. UCI, ubus, rpcd, netifd, firewall4, dnsmasq and the normal OpenWrt services remain the source of truth.
-
-VeCI must not create a parallel router configuration database.
-
-## Layers
+## Runtime model
 
 ```text
 Browser
   |
-  +-- VeCI SPA
-  |     +-- task-oriented pages
-  |     +-- capability / role detection
-  |     +-- application extension points
+  +-- /veci/
+  |    +-- index.html          shell only
+  |    +-- app.css             VeCI design system
+  |    +-- js/app.js           router + session + page lifecycle
+  |    +-- js/lib/*            API, escaping, formatting, icons
+  |    +-- js/pages/*          task-oriented pages
   |
-  +-- OpenWrt ubus JSON-RPC
-        +-- system / network / service
-        +-- uci
-        +-- small veci rpcd helpers
-        +-- optional veci-app-* helpers
+  +-- /ubus
+       +-- session
+       +-- system
+       +-- network.interface
+       +-- network.wireless
+       +-- uci
+       +-- veci                narrow rpcd helper
 ```
 
-## User-experience layers
+OpenWrt remains the source of truth. VeCI does not maintain a second configuration database.
 
-### Everyday layer
+## Browser architecture
 
-The default UI uses concepts that router owners recognize:
+### `js/app.js`
+
+Owns:
+
+- login/logout lifecycle;
+- ubus session validation;
+- top-level navigation;
+- page routing;
+- hardware identity shown in the shell;
+- toast and confirmation UI;
+- optional LuCI Expert detection.
+
+### `js/lib/api.js`
+
+The only general JSON-RPC client in Core.
+
+It:
+
+- posts to same-origin `/ubus`;
+- stores only the ubus session token in `sessionStorage`;
+- exposes typed convenience methods for the OpenWrt objects VeCI uses;
+- does not persist the router password.
+
+### Page modules
+
+Each page represents an operator task, not an OpenWrt config filename:
 
 - Home
 - Internet
@@ -36,114 +61,84 @@ The default UI uses concepts that router owners recognize:
 - Security
 - Network
 - System
+- Apps
 
-A user should not need to understand UCI section names to change a Wi-Fi password, reserve an address, create a guest network or check Internet status.
+Pages may use UCI when configuration data is needed, but UCI terminology is not the primary navigation model.
 
-### Expert layer
+## Server-side helper
 
-Advanced settings remain reachable. During the parity transition, firmware images may keep LuCI installed and expose it through **Expert**. VeCI must never delete or rewrite LuCI configuration just to own the UI.
+`files/rpcd-veci` exposes only a small set of methods:
 
-The long-term target is native VeCI parity, with Expert retained as an optional compatibility tool rather than a requirement.
+- `capabilities`
+- `clients`
+- `networkInventory`
+- `health`
+- `serviceAction`
+
+The helper exists for information that is inconvenient or unsafe to collect through generic browser-side shell calls.
+
+VeCI Core deliberately does **not** grant blanket `file.exec` access.
 
 ## Hardware identity
 
-VeCI core derives identity from `ubus system board` and never hardcodes a product model.
+The shell reads:
 
-Preferred fields:
+```text
+system.board
+```
 
-1. `model`
-2. `board_name`
-3. OpenWrt release information
-4. kernel version
+and displays the returned:
 
-Device-specific controls are capability driven. For example, a cellular page should appear because a modem integration is present, not because the board name equals one hardcoded ZBT model.
+1. `model`;
+2. `board_name`;
+3. OpenWrt release information;
+4. kernel information.
+
+Generic VeCI source must not contain a specific commercial router model as its UI identity.
 
 ## Capability model
 
-A future `veci.capabilities` object will combine:
+Capabilities are discovered from runtime state, not from a hardcoded board list.
 
-- board data;
-- available wireless PHYs;
-- network interfaces and default routes;
-- installed packages;
-- registered ubus objects;
-- UCI configs;
-- optional board profile metadata.
+Core capability examples:
 
-This lets one codebase support routers, APs, switches, travel routers and cellular gateways.
+- OpenNDS config present;
+- SQM config present;
+- DDNS config present;
+- WireGuard available;
+- optional `veci.voucher` ubus provider present.
 
-## Device-role profiles
+A device-specific package can add a VeCI app without changing VeCI Core.
 
-Core profiles:
+## Expert compatibility
 
-- `full_router`: WAN/LAN, firewall, DHCP, DNS, routing.
-- `ap_switch`: status, Wi-Fi, bridges, VLANs, system; L3-only controls hidden from the everyday layer.
-- `cellular_router`: full router plus modem/SIM/data/failover integration when an app exposes that capability.
-- `minimal`: dashboard and system recovery surface.
+VeCI checks whether LuCI is available at `/cgi-bin/luci/`.
 
-Profiles change presentation, not the underlying availability of OpenWrt itself.
+When present, Expert remains available while native VeCI coverage is incomplete. This guarantees that simplifying the default UI does not intentionally hide OpenWrt capability.
 
-## Resource tiers
+The parity status is tracked in [FEATURE-MATRIX.md](FEATURE-MATRIX.md).
 
-### Tier S — small routers
+## Resource policy
 
-Typical: <= 64 MB RAM or <= 16 MB flash.
+VeCI Core has no mandatory traffic-history, DPI, speed-test or flow-analysis daemon.
 
-Core only. No mandatory flow database, DPI engine, Netify, vnStat history daemon or local speed-test server.
+Resource tiers for optional apps:
 
-### Tier M — normal routers
+- **S:** small routers, including 64 MB RAM class devices;
+- **M:** normal current routers;
+- **L:** high-resource devices.
 
-Optional traffic history, monitoring and convenience apps.
-
-### Tier L — high-resource routers
-
-Optional DPI, richer flow analytics and long-term telemetry.
-
-A heavy app must declare its resource expectations.
-
-## Security architecture
-
-VeCI treats browser-side code as privileged administration code.
-
-Rules:
-
-- never persist the router password;
-- session token is stored in `sessionStorage`, not long-lived localStorage;
-- application modules are same-origin only;
-- no arbitrary remote script loading;
-- release apps must be package-managed and signed before the public app store is enabled;
-- privileged shell operations should move to narrow rpcd helpers rather than general shell pipelines;
-- dangerous actions must be explicit and auditable;
-- third-party applications do not gain trust merely because their UI looks native.
-
-## Application packages
-
-Package naming follows OpenWrt convention:
-
-```text
-veci-app-<feature>
-```
-
-Examples:
-
-```text
-veci-app-voucher
-veci-app-cellular
-veci-app-adblock-fast
-veci-app-vnstat
-```
-
-Apps can contribute pages, cards or tabs, but resource-heavy or device-specific dependencies stay outside VeCI Core.
+Apps must declare their expected tier before the public app ecosystem is enabled.
 
 ## Firmware integration
 
-Generic VeCI does not force itself onto `/`.
+Generic package:
 
-A custom firmware may:
+```text
+/veci/            VeCI
+/cgi-bin/luci/    optional Expert UI
+```
 
-1. include `veci`;
-2. make `/veci/` the default landing page;
-3. retain LuCI under `/cgi-bin/luci/` as Expert;
-4. preinstall board-specific `veci-app-*` packages.
+A custom firmware may redirect its root administration landing page to VeCI without changing the generic package.
 
-This separation lets VeCI be reused by other OpenWrt devices without carrying one vendor's hardware assumptions.
+Board-specific modules such as cellular or voucher management are delivered as separate `veci-app-*` packages.

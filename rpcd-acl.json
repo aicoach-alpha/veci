@@ -1,83 +1,25 @@
 {
 	"veci": {
-		"description": "ACL permissions for VeCI OpenWrt interface",
+		"description": "VeCI OpenWrt administration access",
 		"read": {
-			"file": {
-				"/usr/lib/opkg/status": ["read"],
-				"/var/lib/opkg/status": ["read"],
-				"/proc/net/dev": ["read"],
-				"/proc/net/arp": ["read"],
-				"/proc/stat": ["read"],
-				"/etc/crontabs/root": ["read"],
-				"/etc/dropbear/authorized_keys": ["read"],
-				"/etc/hosts": ["read"],
-				"/tmp/firmware.bin": ["read"],
-				"/tmp/backup.tar.gz": ["read"],
-				"/usr/libexec/veci-pkg-call list-present": ["exec"],
-				"/usr/libexec/veci-pkg-call list-installed": ["exec"],
-				"/usr/libexec/veci-pkg-call list-available": ["exec"],
-				"/usr/libexec/veci-pkg-call inspect *": ["exec"],
-				"/usr/libexec/veci-pkg-call feeds": ["exec"],
-				"/sbin/logread": ["exec"],
-				"/bin/dmesg": ["exec"],
-				"/bin/ping": ["exec"],
-				"/bin/ping6": ["exec"],
-				"/usr/bin/traceroute": ["exec"],
-				"/usr/bin/traceroute6": ["exec"],
-				"/usr/bin/nslookup": ["exec"],
-				"/bin/df -h": ["exec"]
-			},
 			"ubus": {
+				"system": ["board", "info"],
 				"network.interface": ["dump"],
+				"network.interface.*": ["status"],
 				"network.wireless": ["status"],
 				"uci": ["get"],
-				"file": ["read"],
-				"system": ["info", "board"],
-				"veci": ["getDHCPLeases", "getPorts", "getBridges"],
-				"service": ["list"]
+				"veci": ["capabilities", "clients", "networkInventory", "health"]
 			},
-			"uci": ["veci"]
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		},
 		"write": {
-			"file": {
-				"/usr/libexec/veci-pkg-call install *": ["exec"],
-				"/usr/libexec/veci-pkg-call remove *": ["exec"],
-				"/usr/libexec/veci-pkg-call update": ["exec"],
-				"/usr/libexec/veci-pkg-call feed-add *": ["exec"],
-				"/usr/libexec/veci-pkg-call feed-remove *": ["exec"],
-				"/usr/bin/etherwake": ["exec"],
-				"/etc/hosts": ["write"],
-				"/etc/crontabs/root": ["write"],
-				"/etc/dropbear/authorized_keys": ["write"],
-				"/tmp/firmware.bin": ["write"],
-				"/etc/init.d/* reload": ["exec"],
-				"/etc/init.d/* start": ["exec"],
-				"/etc/init.d/* stop": ["exec"],
-				"/sbin/sysupgrade --create-backup /tmp/backup.tar.gz": ["exec"],
-				"/sbin/sysupgrade --test /tmp/firmware.bin": ["exec"],
-				"/sbin/sysupgrade /tmp/firmware.bin": ["exec"],
-				"/sbin/sysupgrade -n /tmp/firmware.bin": ["exec"],
-				"/sbin/firstboot -y": ["exec"],
-				"/bin/rm -f /tmp/backup.tar.gz": ["exec"],
-				"/bin/rm -f /tmp/firmware.bin": ["exec"]
-			},
 			"ubus": {
-				"uci": ["set", "add", "delete", "commit"],
-				"file": ["write", "exec"],
 				"system": ["reboot"],
-				"network.interface": ["up", "down"],
-				"veci": ["setPassword", "wgGenKey"]
+				"network.interface.*": ["up", "down"],
+				"uci": ["set", "add", "delete", "commit"],
+				"veci": ["serviceAction"]
 			},
-			"uci": [
-				"network",
-				"wireless",
-				"firewall",
-				"dhcp",
-				"system",
-				"qos",
-				"ddns",
-				"veci"
-			]
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		}
 	}
 }

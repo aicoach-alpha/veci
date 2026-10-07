@@ -8,9 +8,6 @@ devDependencies:
   '@eslint/js':
     specifier: 9.39.1
     version: 9.39.1
-  chokidar:
-    specifier: ^5.0.0
-    version: 5.0.0
   clean-css:
     specifier: ^5.3.3
     version: 5.3.3
@@ -233,13 +230,6 @@ packages:
     dependencies:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
-    dev: true
-
-  /chokidar@5.0.0:
-    resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
-    engines: {node: '>= 20.19.0'}
-    dependencies:
-      readdirp: 5.0.0
     dev: true
 
   /clean-css@5.3.3:
@@ -608,11 +598,6 @@ packages:
   /punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
-    dev: true
-
-  /readdirp@5.0.0:
-    resolution: {integrity: sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ==}
-    engines: {node: '>= 20.19.0'}
     dev: true
 
   /resolve-from@4.0.0:

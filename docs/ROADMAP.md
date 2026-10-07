@@ -1,78 +1,62 @@
 # VeCI roadmap
 
-## Phase 0 — foundation
+## v0.2 — independent foundation
 
-- Import the MIT-licensed MoCI history as the technical baseline.
-- Rebrand package/runtime paths to VeCI.
-- Preserve attribution.
-- Remove browser-side plaintext password persistence.
-- Add dynamic model, board and firmware identity.
-- Introduce task-oriented top-level navigation.
-- Keep LuCI Expert fallback optional.
-- Add lint, formatter, build and package CI.
+- Replace the inherited monolithic shell with VeCI's own page architecture.
+- Use CoachAssist visual tokens and interaction language.
+- Discover hardware from OpenWrt board data.
+- Remove persistent password storage.
+- Remove generic shell execution from the Core ACL.
+- Add Home, Internet, Wi-Fi, Devices, Security, Network, System and Apps pages.
+- Keep LuCI Expert as the compatibility layer.
+- Build architecture-independent OpenWrt packages.
 
-## Phase 1 — vendor-style everyday UI
+## v0.3 — everyday router workflows
 
-- Home health dashboard.
-- Internet wizard and status.
-- Wi-Fi cards per radio / SSID.
-- Connected Devices inventory with friendly names, reservation and block controls.
-- Security center with firewall state and port-forward shortcuts.
-- Guest Wi-Fi workflow.
+- Wi-Fi edit/create workflow with safe WPA2/WPA3 defaults.
+- Guest Wi-Fi wizard.
+- Friendly connected-device naming.
+- Static DHCP reservation workflow.
+- Port-forward wizard.
+- Internet uplink setup wizard.
 - First-run setup wizard.
-- Mobile-first navigation.
-- Light/dark/auto appearance.
+- Language switch.
+- Theme preference: auto / light / dark.
 
-## Phase 2 — full native administration parity
+## v0.4 — native advanced networking
 
-Cover all settings currently available through the retained LuCI compatibility path:
+- Device / bridge editor.
+- Bridge VLAN filtering.
+- IPv4/IPv6 route management.
+- Firewall rules and redirects.
+- DNS / DHCP advanced settings.
+- Multi-WAN capability adapter.
 
-- advanced interface/device/bridge/VLAN configuration;
-- IPv4/IPv6 routes and rules;
-- complete firewall4 surface;
-- DHCP/DNS advanced options;
-- package/service/startup management;
-- firmware, backup, reset and recovery;
-- logs and diagnostics;
-- SSH keys and system administration.
+## v0.5 — system administration
 
-Parity is measured by a maintained feature matrix, not by removing the Expert link.
+- Backup / restore.
+- Firmware validation and upgrade.
+- Service/startup manager.
+- Logs and diagnostics.
+- Package management with explicit storage/RAM warnings.
+- SSH key management.
 
-## Phase 3 — capability and profile engine
+## v0.6 — app SDK
 
-- automatic router/AP/switch role detection;
-- cellular capability provider;
-- multi-WAN/failover provider;
-- dynamic menu composition;
-- board-specific extensions without core hardcoding.
+- Stable `veci-app-*` contract.
+- Signed package feed.
+- Compatibility metadata.
+- Resource-tier declarations.
+- Cellular integration contract.
+- Voucher/captive-portal integration contract.
 
-## Phase 4 — application ecosystem
+## v1.0
 
-- `veci-app-*` package convention;
-- signed package feed;
-- install-time permission/resource disclosure;
-- app compatibility metadata;
-- no unsigned remote JavaScript execution.
+Requirements:
 
-## Phase 5 — custom firmware default
-
-For the aicoach-alpha ZBT firmware:
-
-- VeCI becomes the default landing page;
-- model identity comes from the live board data;
-- cellular/SIM controls appear through a VeCI cellular app;
-- voucher management appears through `veci-app-voucher`;
-- LuCI remains available under Expert until native parity gates are green.
-
-## Release gates
-
-A stable release requires:
-
-- formatter/linter clean;
-- JavaScript syntax/build tests clean;
-- package build on OpenWrt 24.10 and 25.12;
-- no plaintext credential persistence;
-- security review of rpcd helpers and ACLs;
-- real hardware tests on at least one small-MIPS router and one larger reference device;
-- documented upgrade/rollback path;
-- semantic versioned release and checksums.
+- maintained feature matrix;
+- production package builds for supported OpenWrt releases;
+- no known critical security findings;
+- real-device tests on a small MIPS router and a larger reference platform;
+- complete recovery path through LuCI or failsafe;
+- documentation for firmware vendors making VeCI the default UI.

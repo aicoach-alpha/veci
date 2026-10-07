@@ -1,125 +1,173 @@
 # VeCI
 
-**Vendor-style Easy Configuration Interface for OpenWrt**
+**VeCI — Easy Configuration Interface for OpenWrt**
 
-VeCI is a lightweight, hardware-aware web interface for OpenWrt. The goal is to make OpenWrt feel like a polished commercial router UI without removing the power that advanced OpenWrt users expect.
+VeCI is a lightweight, vendor-style administration UI for OpenWrt. It is designed for people who want a router interface that feels like a polished commercial product without losing access to OpenWrt's advanced capabilities.
 
-VeCI is derived from the ideas and MIT-licensed codebase of HudsonGraeme/MoCI. The VeCI project keeps the original project history and adds a different product direction: easier navigation, hardware-aware presentation, safe feature clustering, low-resource operation, and an explicit path to full LuCI feature parity. See [NOTICE.md](NOTICE.md).
+VeCI is not a LuCI theme. It is its own frontend and its own OpenWrt package.
 
-## Design goals
+## What makes VeCI different
 
-- **Easy by default.** Common router tasks are grouped as Home, Internet, Wi-Fi, Devices, Security, Network, System and Apps.
-- **No fake hardware branding.** VeCI reads the actual OpenWrt board data at runtime and displays the real model / board identity reported by the installed hardware.
-- **No feature loss.** VeCI is intended to cover the complete OpenWrt administration surface. On firmware images that also ship LuCI, an Expert entry provides a compatibility escape hatch while native VeCI coverage is completed.
-- **Small-router friendly.** Core VeCI stays framework-free and avoids heavy telemetry daemons. Expensive features belong in optional `veci-app-*` packages.
-- **Modular.** Full router, AP/switch, cellular-router and other device roles can expose different menus without hardcoding one router model.
-- **Secure defaults.** VeCI does not persist the router password in browser storage. The ubus session token is kept in `sessionStorage`, and third-party app loading is disabled by default until the VeCI feed/signing model is production-ready.
-- **OpenWrt-native.** Configuration remains UCI/ubus/rpcd based. VeCI is not a separate configuration database.
+- **Task-first navigation:** Home, Internet, Wi-Fi, Devices, Security, Network, System and Apps.
+- **Hardware-aware:** the displayed manufacturer/model comes from the running OpenWrt board data; VeCI does not hardcode one router model.
+- **CoachAssist visual language:** light blue surfaces, dark navy navigation, compact cards and restrained shadows aligned with the design system used by CoachAssist / vervue.my.id.
+- **Low-resource core:** no mandatory DPI engine, flow database, traffic-history daemon or app store background service.
+- **OpenWrt-native:** UCI, ubus, rpcd, netifd, firewall4 and dnsmasq remain the source of truth.
+- **Expert fallback:** when LuCI is installed, VeCI exposes it as an Expert path while native VeCI coverage is still being completed.
+- **Safer privilege boundary:** VeCI Core uses narrow rpcd methods instead of blanket shell execution.
+- **No stored router password:** the password is never persisted by VeCI in browser storage.
 
-## Current foundation
+## Current native pages
 
-The current development branch already includes the MoCI 0.2-era baseline for:
+| Area | Native VeCI coverage |
+| --- | --- |
+| Home | Router identity, Internet status, Wi-Fi count, DHCP clients, uptime and memory |
+| Internet | Interface status, addresses, protocol, connect/disconnect |
+| Wi-Fi | Radio/SSID discovery and operational status |
+| Devices | DHCP client inventory |
+| Security | Firewall zones, rules and redirect summary |
+| Network | Interfaces, bridges and physical-port inventory |
+| System | Hardware, firmware, runtime resources and reboot |
+| Apps | Lightweight capability discovery |
 
-- live dashboard and traffic graphs;
-- interfaces, bridges and bridge VLANs;
-- wireless configuration;
-- firewall zones, rules, NAT and port forwarding;
-- IPv4/IPv6 routes;
-- DHCP, static leases, DNS and hosts;
-- DDNS, QoS and WireGuard;
-- diagnostics;
-- system configuration, logs, backup/restore, firmware upgrade, services and packages;
-- installable application architecture.
-
-VeCI adds:
-
-- vendor-style top-level clustering;
-- dynamic model / board / firmware identity using `system.board`;
-- session-only credential handling;
-- optional LuCI Expert compatibility link;
-- low-resource-first architecture;
-- device-role profiles and capability-oriented roadmap.
+Advanced configuration remains available through LuCI Expert until each area reaches native parity. See [docs/FEATURE-MATRIX.md](docs/FEATURE-MATRIX.md).
 
 ## Hardware identity
 
-VeCI must never hardcode a specific router brand or model into the generic UI.
+VeCI reads the real board data from:
 
-The dashboard reads:
-
-```text
+```sh
 ubus call system board
 ```
 
-and uses the returned `model`, `board_name`, `release` and kernel information. A ZBT device therefore shows its ZBT model; another supported OpenWrt router shows its own identity.
+The UI prefers the returned `model`, `board_name`, release and kernel values.
 
-Device-specific integrations belong in separate apps or firmware profiles, not in the VeCI core branding.
+That means:
 
-## Navigation model
+- a ZBT router shows the ZBT model reported by OpenWrt;
+- a GL.iNet, Xiaomi, TP-Link, NanoPi or x86 OpenWrt installation shows its own reported identity;
+- generic VeCI source does not contain a hardcoded WE5927 model string.
 
-The default user-facing hierarchy is:
+Device-specific functionality belongs in optional `veci-app-*` packages.
+
+## Architecture
 
 ```text
-Home
-Internet
-Wi-Fi
-Devices
-Security
-Network
-System
-Apps
-Expert
+Browser
+  |
+  +-- VeCI shell
+  |    +-- task-oriented pages
+  |    +-- hardware/capability discovery
+  |    +-- CoachAssist-derived visual tokens
+  |
+  +-- /ubus
+       +-- session
+       +-- system
+       +-- network.interface
+       +-- network.wireless
+       +-- uci
+       +-- veci (narrow rpcd helper)
 ```
 
-The same underlying OpenWrt settings remain available. The hierarchy is intentionally task-oriented rather than exposing UCI concepts first.
+The active source is intentionally split into small VeCI-owned modules:
 
-## Low-resource policy
+```text
+veci/
+  index.html
+  app.css
+  js/
+    app.js
+    lib/
+      api.js
+      dom.js
+      format.js
+      icons.js
+    pages/
+      home.js
+      internet.js
+      wifi.js
+      devices.js
+      security.js
+      network.js
+      system.js
+      apps.js
+```
 
-VeCI Core targets small OpenWrt devices as well as large routers. Heavy capabilities such as DPI/Netify, long-term traffic databases, large flow collectors or speed-test daemons are optional apps and are not part of the core dependency set.
+## Resource policy
 
-This is especially important for devices with 64 MB RAM or small NOR flash.
+VeCI Core is intended to remain practical on small OpenWrt hardware, including 64 MB RAM class devices.
 
-## Installation status
+Heavy features are optional apps:
 
-VeCI is currently **development software**. Do not treat the repository as a stable package feed yet.
+- DPI / application classification
+- long-term flow history
+- vnStat-style history
+- advanced bandwidth accounting
+- speed-test daemons
+- cellular modem integration
+- captive portal / voucher management
 
-For development on a normal OpenWrt router:
+A feature may be visually integrated with VeCI without becoming a mandatory Core dependency.
+
+## Install / build
+
+VeCI is still development software.
 
 ```bash
 git clone https://github.com/aicoach-alpha/veci.git
 cd veci
 pnpm install
-pnpm build
+pnpm check
 ```
 
-The package definition supports OpenWrt packaging. Release packages and signed feeds will be published only after real-hardware and security gates pass.
+The production web bundle is written to `dist/veci/`.
 
-## Default UI in custom firmware
+OpenWrt packaging is defined in [Makefile](Makefile). The package is architecture-independent (`PKGARCH:=all`) and the release workflow validates both OpenWrt 24.10 and 25.12 packaging.
 
-The standalone VeCI package installs under `/veci/` so it does not unexpectedly replace another administrator's UI.
+## Custom firmware integration
 
-A firmware vendor or custom firmware can make VeCI the default landing page while retaining LuCI as an Expert fallback. The aicoach-alpha ZBT firmware will use this model after VeCI passes its hardware gates.
+A firmware vendor can make VeCI the default landing page while keeping LuCI available as Expert.
+
+For the aicoach-alpha ZBT firmware, the intended integration is:
+
+```text
+default administration UI -> VeCI
+advanced compatibility UI -> LuCI Expert
+cellular controls         -> veci-app-cellular
+voucher controls          -> veci-app-voucher
+```
+
+Those device-specific apps are not hardcoded into generic VeCI Core.
 
 ## Security
 
-Read [SECURITY.md](SECURITY.md). Important current principles:
+Read [SECURITY.md](SECURITY.md).
 
-- no plaintext router password in localStorage;
-- same-origin ubus/rpcd access only;
-- no TLS verification bypass;
-- no unsigned public app feed enabled by default;
-- high-risk actions require explicit UI confirmation;
-- LuCI remains available as a compatibility path in the custom firmware until VeCI reaches complete native parity.
+Important defaults:
 
-## Architecture and roadmap
+- same-origin ubus access;
+- session token stored only in `sessionStorage`;
+- no persistent plaintext administrator password;
+- no generic `file.exec` permission in the VeCI Core ACL;
+- public third-party app feed disabled until VeCI has a signing/review pipeline;
+- destructive operations require explicit confirmation.
+
+## Project documents
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Feature matrix](docs/FEATURE-MATRIX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Application model](docs/addons.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Attribution](NOTICE.md)
 
-## Upstream inspiration and community feedback
+## Attribution
 
-VeCI incorporates lessons from the OpenWrt community discussion around MoCI: modular device roles, semantic releases, proper OpenWrt packages, code-quality tooling, smaller server-side helpers instead of fragile shell pipelines, consistent UCI access, explicit security boundaries, and real-hardware testing.
+VeCI was informed by the public MoCI project and the OpenWrt community discussion about modern router UIs. The active VeCI source has since been re-architected into its own application shell, page model, visual system, rpcd helper and packaging boundary.
+
+The upstream attribution required for reused/derived material is retained in [NOTICE.md](NOTICE.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
+MIT. See [LICENSE](LICENSE).
