@@ -26,7 +26,13 @@ method_capabilities() {
 	else
 		voucher=false
 	fi
-	printf '{ "opennds": %s, "sqm": %s, "ddns": %s, "wireguard": %s, "voucher": %s }\n' 		"$opennds" "$sqm" "$ddns" "$wireguard" "$voucher"
+	if ubus list 2>/dev/null | grep -qx 'veci.cellular'; then
+		cellular=true
+	else
+		cellular=false
+	fi
+	printf '{ "opennds": %s, "sqm": %s, "ddns": %s, "wireguard": %s, "voucher": %s, "cellular": %s }\\n' \
+		"$opennds" "$sqm" "$ddns" "$wireguard" "$voucher" "$cellular"
 }
 
 method_clients() {

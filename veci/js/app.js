@@ -9,9 +9,20 @@ import devicesPage from './pages/devices.js';
 import securityPage from './pages/security.js';
 import networkPage from './pages/network.js';
 import systemPage from './pages/system.js';
+import cellularPage from './pages/cellular.js';
 import appsPage from './pages/apps.js';
 
-const pages = [homePage, internetPage, wifiPage, devicesPage, securityPage, networkPage, systemPage, appsPage];
+const pages = [
+	homePage,
+	internetPage,
+	wifiPage,
+	devicesPage,
+	cellularPage,
+	securityPage,
+	networkPage,
+	systemPage,
+	appsPage
+];
 const pageMap = new Map(pages.map(page => [page.id, page]));
 
 class VeciApp {

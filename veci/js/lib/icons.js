@@ -2,6 +2,7 @@ const paths = {
 	home: '<path d="M3 11.5 12 4l9 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5z"/>',
 	globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
 	wifi: '<path d="M4 9a12 12 0 0 1 16 0M7 12.5a7.5 7.5 0 0 1 10 0M10 16a3 3 0 0 1 4 0"/><circle cx="12" cy="19" r="1"/>',
+	signal: '<path d="M5 20v-3M9.5 20v-6M14.5 20v-10M19 20V5"/>',
 	devices:
 		'<rect x="3" y="4" width="13" height="10" rx="2"/><path d="M8 19h9M12 14v5"/><rect x="17" y="8" width="4" height="8" rx="1"/>',
 	shield: '<path d="M12 3 20 6v6c0 5-3.4 8.1-8 9-4.6-.9-8-4-8-9V6z"/><path d="m9 12 2 2 4-4"/>',

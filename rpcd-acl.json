@@ -8,7 +8,8 @@
 				"network.interface.*": ["status"],
 				"network.wireless": ["status"],
 				"uci": ["get"],
-				"veci": ["capabilities", "clients", "networkInventory", "health"]
+				"veci": ["capabilities", "clients", "networkInventory", "health"],
+				"veci.cellular": ["status"]
 			},
 			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		},
@@ -17,7 +18,8 @@
 				"system": ["reboot"],
 				"network.interface.*": ["up", "down"],
 				"uci": ["set", "add", "delete", "commit"],
-				"veci": ["serviceAction", "wifiReload"]
+				"veci": ["serviceAction", "wifiReload"],
+				"veci.cellular": ["reconnect", "switchSim"]
 			},
 			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		}

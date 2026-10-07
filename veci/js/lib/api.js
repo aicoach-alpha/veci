@@ -125,6 +125,15 @@ export class VeciApi {
 		return this.call('uci', 'commit', { config });
 	}
 
+	cellularStatus() {
+		return this.call('veci.cellular', 'status', {});
+	}
+
+	cellularAction(method, params = {}) {
+		if (!['reconnect', 'switchSim'].includes(method)) throw new Error('Unsupported cellular action');
+		return this.call('veci.cellular', method, params);
+	}
+
 	veci(method, params = {}) {
 		return this.call('veci', method, params);
 	}

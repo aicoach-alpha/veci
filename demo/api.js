@@ -236,6 +236,7 @@ export class VeciApi {
 		if (object === 'uci' && method === 'set') return this.uciSet(params.config, params.section, params.values || {});
 		if (object === 'uci' && method === 'delete') return this.uciDelete(params.config, params.section, params.option || null);
 		if (object === 'uci' && method === 'commit') return this.uciCommit(params.config);
+		if (object === 'veci.cellular') return this.cellularAction(method, params);
 		if (object === 'veci') return this.veci(method, params);
 		return {};
 	}
@@ -297,6 +298,36 @@ export class VeciApi {
 	}
 
 	async uciCommit() {
+		return { demo: true };
+	}
+
+	async cellularStatus() {
+		await wait(50);
+		return {
+			enabled: true,
+			online: true,
+			mode: 'RNDIS',
+			data_interface: 'usb0',
+			ipv4: '192.168.7.109/24',
+			gateway: '192.168.7.1',
+			sim: 1,
+			manufacturer: 'Demo Cellular',
+			model: 'CX07E-class modem',
+			revision: 'demo',
+			sim_status: 'READY',
+			operator: 'Mobile Network',
+			access_tech: 'LTE',
+			registration_status: 'Registered',
+			packet_status: 'Attached',
+			signal_percent: 78,
+			signal_dbm: -79
+		};
+	}
+
+	async cellularAction(method, params = {}) {
+		if (method === 'status') return this.cellularStatus();
+		if (method === 'reconnect') return { demo: true, ok: true };
+		if (method === 'switchSim') return { demo: true, ok: true, sim: params.sim || 1 };
 		return { demo: true };
 	}
 

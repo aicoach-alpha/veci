@@ -46,6 +46,7 @@ The screenshot above is generated from that demo build so the README preview sta
 | Internet | Interface status, addresses, protocol, connect/disconnect |
 | Wi-Fi | Radio/SSID discovery plus native SSID, security, visibility, enable/disable and client-isolation editing |
 | Devices | DHCP client inventory |
+| Cellular | Capability-driven modem/SIM/signal status plus reconnect and SIM switching when a `veci.cellular` provider is installed |
 | Security | Firewall zones, rules and redirect summary |
 | Network | Interfaces, bridges and physical-port inventory |
 | System | Hardware, firmware, runtime resources and reboot |
