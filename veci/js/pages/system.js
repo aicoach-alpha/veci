@@ -22,6 +22,7 @@ export default {
 		);
 		const systemSectionId = systemSection?.[0] || null;
 		const configuredHostname = systemSection?.[1]?.hostname || board.hostname || 'OpenWrt';
+		const configuredTimezone = systemSection?.[1]?.zonename || systemSection?.[1]?.timezone || '—';
 
 		root.innerHTML = `
 			<div class="page-intro">
@@ -59,7 +60,7 @@ export default {
 					<div class="detail-list">
 						<div><span>OpenWrt</span><strong>${escapeHtml(firmware)}</strong></div>
 						<div><span>Kernel</span><strong>${escapeHtml(board.kernel || '—')}</strong></div>
-						<div><span>Architecture</span><strong>${escapeHtml(board.system || board.release?.target || '—')}</strong></div>
+						<div><span>Platform</span><strong>${escapeHtml(board.system || board.release?.target || '—')}</strong></div>
 					</div>
 				</article>
 				<article class="panel">
@@ -69,6 +70,7 @@ export default {
 						<div><span>Memory used</span><strong>${formatBytes(memory.used)} / ${formatBytes(memory.total)}</strong></div>
 						<div><span>Load</span><strong>${escapeHtml((info.load || []).map(value => (Number(value) / 65535).toFixed(2)).join(' · ') || '—')}</strong></div>
 						<div><span>Storage</span><strong>${escapeHtml(health.overlay || '—')}</strong></div>
+						<div><span>Timezone</span><strong>${escapeHtml(configuredTimezone)}</strong></div>
 					</div>
 				</article>
 			</div>
