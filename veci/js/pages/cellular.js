@@ -28,9 +28,9 @@ export default {
 			<div class="page-intro">
 				<div>
 					<h2>Mobile connection</h2>
-					<p>Signal, SIM and modem health from the cellular integration installed on this router.</p>
+					<p>Signal, SIM and modem health from the cellular integration installed on this router. Data-link state does not by itself verify Internet reachability.</p>
 				</div>
-				${badge(online ? 'Online' : 'Offline', online ? 'success' : 'danger')}
+				${badge(online ? 'Data link active' : 'Data link down', online ? 'success' : 'danger')}
 			</div>
 
 			<div class="cellular-hero">

@@ -89,8 +89,8 @@ export default {
 					<div class="hero-state">
 						<span class="status-dot ${uplink ? 'online' : ''}"></span>
 						<div>
-							<strong>${uplink ? 'Internet connected' : 'Internet unavailable'}</strong>
-							<span>${uplink ? `${escapeHtml(uplink.interface)} · ${escapeHtml(firstAddress(uplink))}` : 'Check the Internet connection'}</span>
+							<strong>${uplink ? 'Uplink active' : 'Uplink unavailable'}</strong>
+							<span>${uplink ? `${escapeHtml(uplink.interface)} · ${escapeHtml(firstAddress(uplink))} · Internet access not verified` : 'Check the WAN or mobile data link'}</span>
 						</div>
 					</div>
 				</article>
@@ -110,7 +110,7 @@ export default {
 			<section class="metric-grid">
 				<button class="metric-card metric-link" data-go="internet" type="button">
 					<span class="metric-icon">${icon('globe', 'svg-icon')}</span>
-					<div><span>Internet</span><strong>${uplink ? 'Online' : 'Offline'}</strong><small>${escapeHtml(uplink?.proto?.toUpperCase() || 'No uplink')}</small></div>
+					<div><span>Internet</span><strong>${uplink ? 'Uplink active' : 'No uplink'}</strong><small>${uplink ? `${escapeHtml(uplink?.proto?.toUpperCase() || 'UPLINK')} · reachability not verified` : 'No active uplink'}</small></div>
 				</button>
 				<button class="metric-card metric-link" data-go="wifi" type="button">
 					<span class="metric-icon">${icon('wifi', 'svg-icon')}</span>
@@ -129,8 +129,8 @@ export default {
 			<section class="content-grid content-grid-2">
 				<article class="panel">
 					<div class="panel-heading">
-						<div><p class="eyebrow">INTERNET</p><h3>Connection</h3></div>
-						${uplink ? badge('Online', 'success') : badge('Offline', 'danger')}
+						<div><p class="eyebrow">UPLINK</p><h3>Connection</h3></div>
+						${uplink ? badge('Link up', 'success') : badge('Link down', 'danger')}
 					</div>
 					<div class="detail-list">
 						<div><span>Interface</span><strong>${escapeHtml(uplink?.interface || '—')}</strong></div>
