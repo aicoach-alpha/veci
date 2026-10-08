@@ -136,6 +136,70 @@ method_internet_status() {
 	printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": false }\n'
 }
 
+
+method_update_status() {
+	release='unknown'
+	revision='unknown'
+	repository_channel='unknown'
+	package_updates=0
+	sensitive_updates=0
+	owut_available=false
+
+	if [ -r /etc/openwrt_release ]; then
+		release=$(sed -n "s/^DISTRIB_RELEASE='\\(.*\\)'/\\1/p" /etc/openwrt_release | head -n 1)
+		revision=$(sed -n "s/^DISTRIB_REVISION='\\(.*\\)'/\\1/p" /etc/openwrt_release | head -n 1)
+		[ -n "$release" ] || release='unknown'
+		[ -n "$revision" ] || revision='unknown'
+	fi
+
+	repositories=''
+	for repo_file in /etc/apk/repositories /etc/apk/repositories.d/*.list; do
+		[ -r "$repo_file" ] || continue
+		repositories="$repositories
+$(cat "$repo_file" 2>/dev/null)"
+	done
+
+	has_release=false
+	has_snapshot=false
+	printf '%s\n' "$repositories" | grep -Eq '/releases/|packages-25\\.12' && has_release=true || true
+	printf '%s\n' "$repositories" | grep -Eq '/snapshots/|25\\.12-SNAPSHOT' && has_snapshot=true || true
+	if [ "$has_release" = true ] && [ "$has_snapshot" = true ]; then
+		repository_channel='mixed'
+	elif [ "$has_snapshot" = true ]; then
+		repository_channel='snapshot'
+	elif [ "$has_release" = true ]; then
+		repository_channel='release'
+	fi
+
+	if command -v apk >/dev/null 2>&1; then
+		tmp="/tmp/veci-upgradeable.$"
+		apk list --upgradeable > "$tmp" 2>/dev/null || true
+		while IFS= read -r line; do
+			[ -n "$line" ] || continue
+			package_updates=$((package_updates + 1))
+			case "$line" in
+				kernel-*|kmod-*|base-files-*|busybox-*|libc-*|libubox-*|libubus-*|libuci-*|libblobmsg-json-*|procd-*|rpcd-*|netifd-*|ucode-*|uhttpd-*|hostapd-*|wpad-*|firewall4-*|nftables-*|dnsmasq-*|odhcp*|ppp-*|apk-*|fstools-*)
+					sensitive_updates=$((sensitive_updates + 1))
+					;;
+			esac
+		done < "$tmp"
+		rm -f "$tmp"
+	fi
+
+	command -v owut >/dev/null 2>&1 && owut_available=true
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_string release "$(clean_text "$release")"
+	json_add_string revision "$(clean_text "$revision")"
+	json_add_string repository_channel "$repository_channel"
+	json_add_int package_updates "$package_updates"
+	json_add_int sensitive_updates "$sensitive_updates"
+	[ "$owut_available" = true ] && json_add_boolean owut_available 1 || json_add_boolean owut_available 0
+	json_add_string upgrade_policy "firmware_image_only"
+	json_dump
+}
+
 method_diagnostic() {
 	input=$(cat)
 	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
@@ -272,7 +336,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -281,6 +345,7 @@ case "$1" in
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;
 			internetStatus) method_internet_status ;;
+			updateStatus) method_update_status ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
 			diagnostic) method_diagnostic ;;
