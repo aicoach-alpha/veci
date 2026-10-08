@@ -53,6 +53,7 @@ export default {
 
 		const uplink = defaultRouteInterface(interfaces);
 		const memory = formatMemory(system.memory || {});
+		const memoryPercent = Math.min(Math.max(memory.percent, 0), 100);
 		const { radios, networks } = wifiInventory(wireless, wirelessConfig);
 		const clientCount = clients.clients?.length || 0;
 		const model = state.board?.model || state.board?.board_name || 'OpenWrt Router';
@@ -147,7 +148,7 @@ export default {
 					</div>
 					<div class="resource-row">
 						<div><span>Memory</span><strong>${formatBytes(memory.used)} / ${formatBytes(memory.total)}</strong></div>
-						<div class="progress-track" style="--progress:${Math.min(Math.max(memory.percent, 0), 100)}%"><span></span></div>
+						<progress class="memory-progress" max="100" value="${memoryPercent}" aria-label="Memory used"></progress>
 					</div>
 					<div class="detail-list compact">
 						<div><span>Firmware</span><strong>${escapeHtml(firmware)}</strong></div>
