@@ -87,10 +87,10 @@ export default {
 						<p>${escapeHtml(boardName || firmware)}</p>
 					</div>
 					<div class="hero-state">
-						<span class="status-dot ${uplink ? 'online' : ''}"></span>
+						<span id="home-connectivity-dot" class="status-dot"></span>
 						<div>
-							<strong>${uplink ? 'Uplink active' : 'Uplink unavailable'}</strong>
-							<span>${uplink ? `${escapeHtml(uplink.interface)} · ${escapeHtml(firstAddress(uplink))} · Internet access not verified` : 'Check the WAN or mobile data link'}</span>
+							<strong id="home-connectivity-title">${uplink ? 'Checking Internet…' : 'Uplink unavailable'}</strong>
+							<span id="home-connectivity-detail">${uplink ? `${escapeHtml(uplink.interface)} · ${escapeHtml(firstAddress(uplink))} · uplink active` : 'Check the WAN or mobile data link'}</span>
 						</div>
 					</div>
 				</article>
@@ -110,7 +110,7 @@ export default {
 			<section class="metric-grid">
 				<button class="metric-card metric-link" data-go="internet" type="button">
 					<span class="metric-icon">${icon('globe', 'svg-icon')}</span>
-					<div><span>Internet</span><strong>${uplink ? 'Uplink active' : 'No uplink'}</strong><small>${uplink ? `${escapeHtml(uplink?.proto?.toUpperCase() || 'UPLINK')} · reachability not verified` : 'No active uplink'}</small></div>
+					<div><span>Internet</span><strong id="home-internet-metric">${uplink ? 'Checking…' : 'No uplink'}</strong><small id="home-internet-metric-detail">${uplink ? `${escapeHtml(uplink?.proto?.toUpperCase() || 'UPLINK')} · uplink active` : 'No active uplink'}</small></div>
 				</button>
 				<button class="metric-card metric-link" data-go="wifi" type="button">
 					<span class="metric-icon">${icon('wifi', 'svg-icon')}</span>
@@ -130,7 +130,7 @@ export default {
 				<article class="panel">
 					<div class="panel-heading">
 						<div><p class="eyebrow">UPLINK</p><h3>Connection</h3></div>
-						${uplink ? badge('Link up', 'success') : badge('Link down', 'danger')}
+						<span id="home-uplink-badge">${uplink ? badge('Checking', 'neutral') : badge('Link down', 'danger')}</span>
 					</div>
 					<div class="detail-list">
 						<div><span>Interface</span><strong>${escapeHtml(uplink?.interface || '—')}</strong></div>
@@ -157,6 +157,54 @@ export default {
 				</article>
 			</section>
 		`;
+
+		if (uplink) {
+			api.veci('internetStatus', {}, { timeout: 3000 })
+				.then(status => {
+					const title = root.querySelector('#home-connectivity-title');
+					const detail = root.querySelector('#home-connectivity-detail');
+					const metric = root.querySelector('#home-internet-metric');
+					const metricDetail = root.querySelector('#home-internet-metric-detail');
+					const dot = root.querySelector('#home-connectivity-dot');
+					const badgeHost = root.querySelector('#home-uplink-badge');
+					if (!title || !detail || !metric || !metricDetail || !dot || !badgeHost) return;
+
+					if (status.status === 'reachable' && status.reachable === true) {
+						title.textContent = 'Internet reachable';
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · verified`;
+						metric.textContent = 'Internet reachable';
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · verified`;
+						dot.classList.add('online');
+						badgeHost.innerHTML = badge('Internet reachable', 'success');
+					} else if (status.status === 'unreachable' && status.reachable === false) {
+						title.textContent = 'Internet unavailable';
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · uplink active`;
+						metric.textContent = 'Internet unavailable';
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · uplink active`;
+						dot.classList.remove('online');
+						badgeHost.innerHTML = badge('No Internet', 'danger');
+					} else {
+						title.textContent = 'Uplink active';
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · Internet not verified`;
+						metric.textContent = 'Uplink active';
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · reachability not verified`;
+						dot.classList.remove('online');
+						badgeHost.innerHTML = badge('Link up', 'neutral');
+					}
+				})
+				.catch(() => {
+					const title = root.querySelector('#home-connectivity-title');
+					const detail = root.querySelector('#home-connectivity-detail');
+					const metric = root.querySelector('#home-internet-metric');
+					const metricDetail = root.querySelector('#home-internet-metric-detail');
+					const badgeHost = root.querySelector('#home-uplink-badge');
+					if (title) title.textContent = 'Uplink active';
+					if (detail) detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · Internet not verified`;
+					if (metric) metric.textContent = 'Uplink active';
+					if (metricDetail) metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · reachability not verified`;
+					if (badgeHost) badgeHost.innerHTML = badge('Link up', 'neutral');
+				});
+		}
 
 		const passwordForm = root.querySelector('#admin-password-form');
 		passwordForm?.addEventListener('submit', async event => {

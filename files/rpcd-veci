@@ -99,6 +99,43 @@ method_health() {
 	printf '{ "overlay": "%s" }\n' "$overlay"
 }
 
+method_internet_status() {
+	cache=/tmp/veci-internet-status
+	now=$(date +%s)
+
+	if [ -r "$cache" ]; then
+		read -r stamp state target < "$cache" || true
+		case "$stamp" in
+			*[!0-9]*|'') ;;
+			*)
+				age=$((now - stamp))
+				if [ "$age" -ge 0 ] && [ "$age" -lt 10 ]; then
+					case "$state" in
+						reachable) printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": true }\n' "$target"; return ;;
+						unreachable) printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": true }\n'; return ;;
+					esac
+				fi
+				;;
+		esac
+	fi
+
+	command -v ping >/dev/null 2>&1 || {
+		printf '{ "status": "unknown", "reachable": null, "probe": "unavailable", "cached": false }\n'
+		return
+	}
+
+	for target in 1.1.1.1 8.8.8.8; do
+		if ping -c 1 -W 1 "$target" >/dev/null 2>&1; then
+			printf '%s reachable %s\n' "$now" "$target" > "$cache"
+			printf '{ "status": "reachable", "reachable": true, "probe": "icmp", "target": "%s", "cached": false }\n' "$target"
+			return
+		fi
+	done
+
+	printf '%s unreachable -\n' "$now" > "$cache"
+	printf '{ "status": "unreachable", "reachable": false, "probe": "icmp", "cached": false }\n'
+}
+
 method_diagnostic() {
 	input=$(cat)
 	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
@@ -235,7 +272,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -243,6 +280,7 @@ case "$1" in
 			clients) method_clients ;;
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;
+			internetStatus) method_internet_status ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
 			diagnostic) method_diagnostic ;;

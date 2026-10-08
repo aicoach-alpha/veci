@@ -75,6 +75,7 @@ export default {
 						${metric('Gateway', status.gateway)}
 						${metric('Data interface', status.data_interface)}
 						${metric('Mode', status.mode)}
+						<div id="cellular-internet-status"><span>Internet</span><strong>${online ? 'Checking…' : 'Unavailable'}</strong></div>
 					</div>
 					<div class="cellular-actions">
 						<button class="button button-secondary" id="cellular-reconnect" type="button">Reconnect data</button>
@@ -88,6 +89,21 @@ export default {
 				<p>VeCI Core does not assume a specific modem or router. This page appears only when the firmware exposes the standard <code>veci.cellular</code> provider.</p>
 			</div>
 		`;
+
+		if (online) {
+			api.veci('internetStatus', {}, { timeout: 3000 })
+				.then(internet => {
+					const value = root.querySelector('#cellular-internet-status strong');
+					if (!value) return;
+					if (internet.status === 'reachable' && internet.reachable === true) value.textContent = 'Reachable';
+					else if (internet.status === 'unreachable' && internet.reachable === false) value.textContent = 'Unavailable';
+					else value.textContent = 'Not verified';
+				})
+				.catch(() => {
+					const value = root.querySelector('#cellular-internet-status strong');
+					if (value) value.textContent = 'Not verified';
+				});
+		}
 
 		const reconnect = root.querySelector('#cellular-reconnect');
 		reconnect?.addEventListener('click', async () => {
