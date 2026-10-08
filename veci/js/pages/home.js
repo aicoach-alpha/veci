@@ -147,7 +147,7 @@ export default {
 					</div>
 					<div class="resource-row">
 						<div><span>Memory</span><strong>${formatBytes(memory.used)} / ${formatBytes(memory.total)}</strong></div>
-						<div class="progress-track"><span style="width:${memory.percent}%"></span></div>
+						<div class="progress-track" style="--progress:${Math.min(Math.max(memory.percent, 0), 100)}%"><span></span></div>
 					</div>
 					<div class="detail-list compact">
 						<div><span>Firmware</span><strong>${escapeHtml(firmware)}</strong></div>
