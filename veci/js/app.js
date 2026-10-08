@@ -10,6 +10,7 @@ import securityPage from './pages/security.js';
 import networkPage from './pages/network.js';
 import systemPage from './pages/system.js';
 import cellularPage from './pages/cellular.js';
+import updatesPage from './pages/updates.js';
 import appsPage from './pages/apps.js';
 
 const pages = [
@@ -21,6 +22,7 @@ const pages = [
 	securityPage,
 	networkPage,
 	systemPage,
+	updatesPage,
 	appsPage
 ];
 const pageMap = new Map(pages.map(page => [page.id, page]));
