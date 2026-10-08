@@ -143,6 +143,8 @@ method_update_status() {
 	repository_channel='unknown'
 	package_updates=0
 	sensitive_updates=0
+	kernel_feed_mismatch=false
+	custom_feed_configured=false
 	owut_available=false
 
 	if [ -r /etc/openwrt_release ]; then
@@ -186,6 +188,18 @@ $(cat "$repo_file" 2>/dev/null)"
 		rm -f "$tmp"
 	fi
 
+	if command -v apk >/dev/null 2>&1 && apk list --upgradeable kernel 2>/dev/null | grep -q '^kernel-'; then
+		kernel_feed_mismatch=true
+	fi
+
+	for custom_file in /etc/apk/repositories.d/customfeeds.list /etc/apk/repositories.d/customfeeds.dist; do
+		[ -r "$custom_file" ] || continue
+		if grep -Eq '^[[:space:]]*https?://' "$custom_file"; then
+			custom_feed_configured=true
+			break
+		fi
+	done
+
 	command -v owut >/dev/null 2>&1 && owut_available=true
 
 	. /usr/share/libubox/jshn.sh
@@ -195,6 +209,8 @@ $(cat "$repo_file" 2>/dev/null)"
 	json_add_string repository_channel "$repository_channel"
 	json_add_int package_updates "$package_updates"
 	json_add_int sensitive_updates "$sensitive_updates"
+	[ "$kernel_feed_mismatch" = true ] && json_add_boolean kernel_feed_mismatch 1 || json_add_boolean kernel_feed_mismatch 0
+	[ "$custom_feed_configured" = true ] && json_add_boolean custom_feed_configured 1 || json_add_boolean custom_feed_configured 0
 	[ "$owut_available" = true ] && json_add_boolean owut_available 1 || json_add_boolean owut_available 0
 	json_add_string upgrade_policy "firmware_image_only"
 	json_dump
