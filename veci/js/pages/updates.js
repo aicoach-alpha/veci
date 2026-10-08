@@ -33,6 +33,8 @@ export default {
 			const optionalUpdates = Math.max(0, packageUpdates - sensitiveUpdates);
 			const channel = status.repository_channel || 'unknown';
 			const snapshotWarning = channel === 'snapshot' || channel === 'mixed';
+			const kernelFeedMismatch = Boolean(status.kernel_feed_mismatch);
+			const customFeed = Boolean(status.custom_feed_configured);
 
 			root.innerHTML = `
 				<div class="page-intro">
@@ -66,6 +68,8 @@ export default {
 							<div><span>Upgradeable packages</span><strong>${packageUpdates}</strong></div>
 							<div><span>Base-sensitive packages</span><strong>${sensitiveUpdates}</strong></div>
 							<div><span>Other packages</span><strong>${optionalUpdates}</strong></div>
+							<div><span>Kernel feed match</span><strong>${kernelFeedMismatch ? 'Mismatch — firmware rebuild required' : 'No mismatch detected'}</strong></div>
+							<div><span>VeCI custom feed</span><strong>${customFeed ? 'Configured' : 'Not configured'}</strong></div>
 							<div><span>owut</span><strong>${boolText(Boolean(status.owut_available))}</strong></div>
 						</div>
 					</article>
@@ -80,11 +84,19 @@ export default {
 				</article>
 
 				<div class="notice-card">
-					<strong>${snapshotWarning ? 'Repository warning: development feed detected.' : 'Package upgrades are informational.'}</strong>
+					<strong>${
+						kernelFeedMismatch
+							? 'Kernel package feed does not match this custom firmware.'
+							: snapshotWarning
+								? 'Repository warning: development feed detected.'
+								: 'Package upgrades are informational.'
+					}</strong>
 					<p>${
-						snapshotWarning
-							? 'This router is seeing a snapshot or mixed package source. Do not mass-upgrade packages; use a tested firmware image instead.'
-							: 'VeCI does not run apk upgrade. Core libraries, kernel-related packages and network services should move together inside a tested firmware image.'
+						kernelFeedMismatch
+							? 'Do not install the offered kernel or kernel modules from the official target feed. VeCI must use packages built against the exact firmware kernel ABI.'
+							: snapshotWarning
+								? 'This router is seeing a snapshot or mixed package source. Do not mass-upgrade packages; use a tested firmware image instead.'
+								: 'VeCI does not run apk upgrade. Core libraries, kernel-related packages and network services should move together inside a tested firmware image.'
 					}</p>
 				</div>
 			`;
