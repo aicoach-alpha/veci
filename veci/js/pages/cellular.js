@@ -96,7 +96,8 @@ export default {
 					const value = root.querySelector('#cellular-internet-status strong');
 					if (!value) return;
 					if (internet.status === 'reachable' && internet.reachable === true) value.textContent = 'Reachable';
-					else if (internet.status === 'unreachable' && internet.reachable === false) value.textContent = 'Unavailable';
+					else if (internet.status === 'unreachable' && internet.reachable === false)
+						value.textContent = 'Unavailable';
 					else value.textContent = 'Not verified';
 				})
 				.catch(() => {

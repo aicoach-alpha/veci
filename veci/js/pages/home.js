@@ -200,9 +200,11 @@ export default {
 					const metricDetail = root.querySelector('#home-internet-metric-detail');
 					const badgeHost = root.querySelector('#home-uplink-badge');
 					if (title) title.textContent = 'Uplink active';
-					if (detail) detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · Internet not verified`;
+					if (detail)
+						detail.textContent = `${uplink.interface} · ${firstAddress(uplink)} · Internet not verified`;
 					if (metric) metric.textContent = 'Uplink active';
-					if (metricDetail) metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · reachability not verified`;
+					if (metricDetail)
+						metricDetail.textContent = `${uplink.proto?.toUpperCase() || 'UPLINK'} · reachability not verified`;
 					if (badgeHost) badgeHost.innerHTML = badge('Link up', 'neutral');
 				});
 		}
