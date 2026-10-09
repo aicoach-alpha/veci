@@ -55,7 +55,8 @@ export default {
 			const customFeed = Boolean(status.custom_feed_configured);
 			const veciEntries = Object.entries(veciConfig.values || {});
 			const mainEntry =
-				veciEntries.find(([name]) => name === 'main') || veciEntries.find(([, value]) => value['.type'] === 'core');
+				veciEntries.find(([name]) => name === 'main') ||
+				veciEntries.find(([, value]) => value['.type'] === 'core');
 			const mainSection = mainEntry?.[0] || null;
 			const mainConfig = mainEntry?.[1] || {};
 			const autoCheck = mainConfig.firmware_auto_check === '1';
@@ -175,7 +176,10 @@ export default {
 							<span>Check interval</span>
 							<select id="auto-update-interval">
 								${['1', '6', '12', '24', '48', '72', '168']
-									.map(hours => `<option value="${hours}" ${hours === autoInterval ? 'selected' : ''}>${hours} hour${hours === '1' ? '' : 's'}</option>`)
+									.map(
+										hours =>
+											`<option value="${hours}" ${hours === autoInterval ? 'selected' : ''}>${hours} hour${hours === '1' ? '' : 's'}</option>`
+									)
 									.join('')}
 							</select>
 						</label>
@@ -277,7 +281,8 @@ export default {
 				}
 			});
 
-			const upload = root.querySelector('#upload-manual-firmware');			const fileInput = root.querySelector('#manual-firmware-file');
+			const upload = root.querySelector('#upload-manual-firmware');
+			const fileInput = root.querySelector('#manual-firmware-file');
 			upload?.addEventListener('click', async () => {
 				const file = fileInput?.files?.[0];
 				if (!file) {
