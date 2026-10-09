@@ -229,163 +229,7 @@ package_manager() {
 package_installed() {
 	case "$(package_manager)" in
 		apk) apk info -e "$1" >/dev/null 2>&1 ;;
-		opkg) opkg status "$1" 2>/dev/null | grep -q '^Status: install ok installed	input=$(cat)
-	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
-	target=$(printf '%s' "$input" | jsonfilter -e '@.target' 2>/dev/null)
-	safe_target=$(clean_token "$target")
-
-	[ -n "$target" ] && [ "$safe_target" = "$target" ] && [ "${#target}" -le 253 ] || {
-		printf '{ "ok": false, "error": "invalid_target" }\n'
-		return
-	}
-
-	case "$tool" in
-		ping)
-			output=$(ping -c 4 -W 2 "$target" 2>&1)
-			rc=$?
-			;;
-		traceroute)
-			command -v traceroute >/dev/null 2>&1 || {
-				printf '{ "ok": false, "error": "traceroute_not_available" }\n'
-				return
-			}
-			output=$(traceroute -m 10 -w 1 -q 1 "$target" 2>&1)
-			rc=$?
-			;;
-		*)
-			printf '{ "ok": false, "error": "tool_not_allowed" }\n'
-			return
-			;;
-	esac
-
-	output=$(printf '%s\n' "$output" | sed -n '1,30p')
-	. /usr/share/libubox/jshn.sh
-	json_init
-	[ "$rc" -eq 0 ] && json_add_boolean ok 1 || json_add_boolean ok 0
-	json_add_string tool "$tool"
-	json_add_string target "$target"
-	json_add_string output "$output"
-	json_dump
-}
-
-root_password_is_set() {
-	hash=$(awk -F: '$1 == "root" { print $2; exit }' /etc/shadow 2>/dev/null)
-	case "$hash" in
-		''|'!'|'*'|'!!') return 1 ;;
-		*) return 0 ;;
-	esac
-}
-
-method_security_status() {
-	if root_password_is_set; then
-		printf '{ "root_password_set": true }\n'
-	else
-		printf '{ "root_password_set": false }\n'
-	fi
-}
-
-method_set_admin_password() {
-	root_password_is_set && {
-		printf '{ "ok": false, "error": "password_already_set" }\n'
-		return
-	}
-
-	input=$(cat)
-	password=$(printf '%s' "$input" | jsonfilter -e '@.password' 2>/dev/null)
-	length=${#password}
-	flat_password=$(printf '%s' "$password" | tr -d '\r\n')
-
-	[ "$flat_password" = "$password" ] || {
-		printf '{ "ok": false, "error": "password_characters" }\n'
-		return
-	}
-
-	[ "$length" -ge 8 ] && [ "$length" -le 72 ] || {
-		printf '{ "ok": false, "error": "password_length" }\n'
-		return
-	}
-
-	LC_ALL=C printf '%s' "$password" | grep -q '^[ -~]*$' || {
-		printf '{ "ok": false, "error": "password_characters" }\n'
-		return
-	}
-
-	command -v passwd >/dev/null 2>&1 || {
-		printf '{ "ok": false, "error": "passwd_not_available" }\n'
-		return
-	}
-
-	if printf '%s\n%s\n' "$password" "$password" | passwd root >/dev/null 2>&1; then
-		printf '{ "ok": true }\n'
-	else
-		printf '{ "ok": false, "error": "password_change_failed" }\n'
-	fi
-}
-
-method_service_action() {
-	input=$(cat)
-	service=$(printf '%s' "$input" | jsonfilter -e '@.service')
-	action=$(printf '%s' "$input" | jsonfilter -e '@.action')
-
-	case "$service" in
-		network|firewall|dnsmasq|uhttpd|opennds) ;;
-		*) printf '{ "ok": false, "error": "service_not_allowed" }\n'; return ;;
-	esac
-
-	case "$action" in
-		start|stop|restart|reload) ;;
-		*) printf '{ "ok": false, "error": "action_not_allowed" }\n'; return ;;
-	esac
-
-	script="/etc/init.d/$service"
-	[ -x "$script" ] || {
-		printf '{ "ok": false, "error": "service_not_installed" }\n'
-		return
-	}
-
-	if "$script" "$action" >/dev/null 2>&1; then
-		printf '{ "ok": true }\n'
-	else
-		printf '{ "ok": false, "error": "service_action_failed" }\n'
-	fi
-}
-
-method_wifi_reload() {
-	if ! command -v wifi >/dev/null 2>&1; then
-		printf '{ "ok": false, "error": "wifi_command_not_found" }\n'
-		return
-	fi
-	if wifi reload >/dev/null 2>&1; then
-		printf '{ "ok": true }\n'
-	else
-		printf '{ "ok": false, "error": "wifi_reload_failed" }\n'
-	fi
-}
-
-case "$1" in
-	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
-		;;
-	call)
-		case "$2" in
-			capabilities) method_capabilities ;;
-			clients) method_clients ;;
-			networkInventory) method_network_inventory ;;
-			health) method_health ;;
-			internetStatus) method_internet_status ;;
-			updateStatus) method_update_status ;;
-			apps) method_apps ;;
-			appAction) method_app_action ;;
-			securityStatus) method_security_status ;;
-			setAdminPassword) method_set_admin_password ;;
-			diagnostic) method_diagnostic ;;
-			serviceAction) method_service_action ;;
-			wifiReload) method_wifi_reload ;;
-			*) printf '{ "error": "method_not_found" }\n' ;;
-		esac
-		;;
-esac
- ;;
+		opkg) opkg status "$1" 2>/dev/null | grep -q '^Status: install ok installed$' ;;
 		*) return 1 ;;
 	esac
 }
@@ -675,7 +519,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -685,6 +529,8 @@ case "$1" in
 			health) method_health ;;
 			internetStatus) method_internet_status ;;
 			updateStatus) method_update_status ;;
+			apps) method_apps ;;
+			appAction) method_app_action ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
 			diagnostic) method_diagnostic ;;
