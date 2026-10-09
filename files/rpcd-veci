@@ -475,17 +475,24 @@ firmware_tmp_has_space() {
 	[ "$available" -ge $((required + margin)) ] 2>/dev/null
 }
 
-firmware_signature_required() {
+firmware_keys_present() {
 	[ -d /etc/veci/firmware-keys ] || return 1
 	for key in /etc/veci/firmware-keys/*; do
-		[ -s "$key" ] && return 0
+		[ -f "$key" ] && [ -s "$key" ] && return 0
 	done
 	return 1
+}
+
+firmware_signature_required() {
+	# Published firmware must never silently downgrade to unsigned mode when keys disappear.
+	[ "$(cat /etc/veci-release-channel 2>/dev/null || true)" = "published" ] && return 0
+	firmware_keys_present
 }
 
 firmware_verify_signature() {
 	image="$1"
 	firmware_signature_required || return 2
+	firmware_keys_present || return 1
 	command -v fwtool >/dev/null 2>&1 || return 1
 	command -v ucert >/dev/null 2>&1 || return 1
 
