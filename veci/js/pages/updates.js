@@ -193,7 +193,8 @@ export default {
 					if (!start.ok) throw new Error(start.error || 'Could not start firmware upload');
 					const maxBytes = Number(start.max_bytes) || 0;
 					const chunkBytes = Number(start.chunk_bytes) || 32768;
-					if (maxBytes > 0 && file.size > maxBytes) throw new Error('Firmware image exceeds this router profile limit');
+					if (maxBytes > 0 && file.size > maxBytes)
+						throw new Error('Firmware image exceeds this router profile limit');
 
 					upload.textContent = 'Calculating SHA256…';
 					const sha256 = await sha256File(file);
@@ -226,7 +227,8 @@ export default {
 				}
 			});
 
-			const check = root.querySelector('#check-firmware');			check?.addEventListener('click', async () => {
+			const check = root.querySelector('#check-firmware');
+			check?.addEventListener('click', async () => {
 				setBusy(check, true, 'Checking…');
 				try {
 					const result = await api.veci('firmwareCheck', {}, { timeout: 30000 });
