@@ -475,6 +475,32 @@ firmware_tmp_has_space() {
 	[ "$available" -ge $((required + margin)) ] 2>/dev/null
 }
 
+firmware_signature_required() {
+	[ -d /etc/veci/firmware-keys ] || return 1
+	for key in /etc/veci/firmware-keys/*; do
+		[ -s "$key" ] && return 0
+	done
+	return 1
+}
+
+firmware_verify_signature() {
+	image="$1"
+	firmware_signature_required || return 2
+	command -v fwtool >/dev/null 2>&1 || return 1
+	command -v ucert >/dev/null 2>&1 || return 1
+
+	cert='/tmp/veci-firmware.ucert'
+	rm -f "$cert"
+	fwtool -q -s "$cert" "$image" >/dev/null 2>&1 || {
+		rm -f "$cert"
+		return 1
+	}
+	fwtool -q -T -s /dev/null "$image" 2>/dev/null | 		ucert -V -m - -c "$cert" -P /etc/veci/firmware-keys >/dev/null 2>&1
+	rc=$?
+	rm -f "$cert"
+	return "$rc"
+}
+
 firmware_fetch() {
 	url="$1"
 	output="$2"
@@ -541,7 +567,7 @@ method_firmware_status() {
 		command -v sha256sum >/dev/null 2>&1 && sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
 	fi
 	if [ -r "$firmware_validation_meta" ]; then
-		read -r validation_sha validation_board validation_token < "$firmware_validation_meta" || true
+		read -r validation_sha validation_board validation_token validation_signature < "$firmware_validation_meta" || true
 		if [ -n "$sha" ] && [ "$validation_sha" = "$sha" ] && [ "$validation_board" = "$(firmware_board_name)" ]; then
 			validated=true
 			[ -n "$validation_token" ] && token_ready=true
@@ -555,6 +581,18 @@ method_firmware_status() {
 	[ "$staged" = true ] && json_add_boolean staged 1 || json_add_boolean staged 0
 	[ "$validated" = true ] && json_add_boolean validated 1 || json_add_boolean validated 0
 	[ "$token_ready" = true ] && json_add_boolean apply_ready 1 || json_add_boolean apply_ready 0
+	[ "$validation_signature" = "signed" ] && json_add_boolean signature_verified 1 || json_add_boolean signature_verified 0
+	if firmware_signature_required; then
+		json_add_string signature_policy "required"
+		if command -v ucert >/dev/null 2>&1 && command -v fwtool >/dev/null 2>&1; then
+			json_add_boolean automatic_install_supported 1
+		else
+			json_add_boolean automatic_install_supported 0
+		fi
+	else
+		json_add_string signature_policy "development"
+		json_add_boolean automatic_install_supported 0
+	fi
 	json_add_int bytes "$bytes"
 	json_add_string sha256 "$sha"
 	json_add_int max_bytes "$firmware_max_bytes"
@@ -707,11 +745,22 @@ method_firmware_validate() {
 		printf '{ "ok": false, "error": "sysupgrade_test_failed" }\n'
 		return
 	fi
+
+	signature_state='development'
+	if firmware_signature_required; then
+		if firmware_verify_signature "$firmware_path"; then
+			signature_state='signed'
+		else
+			printf '{ "ok": false, "error": "firmware_signature_invalid" }\n'
+			return
+		fi
+	fi
+
 	board="$(firmware_board_name)"
 	token="$(firmware_token)"
-	printf '%s %s %s\n' "$sha" "$board" "$token" > "$firmware_validation_meta"
-	printf '{ "ok": true, "validated": true, "board": "%s", "bytes": %s, "sha256": "%s", "apply_token": "%s" }\n' \
-		"$board" "$bytes" "$sha" "$token"
+	printf '%s %s %s %s\n' "$sha" "$board" "$token" "$signature_state" > "$firmware_validation_meta"
+	printf '{ "ok": true, "validated": true, "signature_verified": %s, "board": "%s", "bytes": %s, "sha256": "%s", "apply_token": "%s" }\n' \
+		"$([ "$signature_state" = signed ] && printf true || printf false)" "$board" "$bytes" "$sha" "$token"
 }
 
 method_firmware_remote_check() {
@@ -810,17 +859,25 @@ method_firmware_policy_save() {
 	[ "$auto_download" = false ] && auto_download=0
 	[ "$auto_install" = false ] && auto_install=0
 
-	[ "$auto_install" = "1" ] && {
-		printf '{ "ok": false, "error": "automatic_install_requires_signed_metadata" }\n'
-		return
-	}
+	if [ "$auto_install" = "1" ]; then
+		firmware_signature_required || {
+			printf '{ "ok": false, "error": "automatic_install_requires_firmware_signing_key" }\n'
+			return
+		}
+		command -v ucert >/dev/null 2>&1 && command -v fwtool >/dev/null 2>&1 || {
+			printf '{ "ok": false, "error": "automatic_install_signature_tools_missing" }\n'
+			return
+		}
+		auto_download=1
+		auto_check=1
+	fi
 	[ "$auto_download" = "1" ] && auto_check=1
 
 	uci -q batch <<EOF
 set veci.update=update
 set veci.update.auto_check='$auto_check'
 set veci.update.auto_download='$auto_download'
-set veci.update.auto_install='0'
+set veci.update.auto_install='$auto_install'
 EOF
 	uci commit veci
 	printf '{ "ok": true }\n'
@@ -834,12 +891,16 @@ method_firmware_apply() {
 		printf '{ "ok": false, "error": "firmware_not_validated" }\n'
 		return
 	}
-	read -r validation_sha validation_board validation_token < "$firmware_validation_meta" || true
+	read -r validation_sha validation_board validation_token validation_signature < "$firmware_validation_meta" || true
 	current_sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
 	[ -n "$token" ] && [ "$token" = "$validation_token" ] && [ "$current_sha" = "$validation_sha" ] && [ "$(firmware_board_name)" = "$validation_board" ] || {
 		printf '{ "ok": false, "error": "validation_token_mismatch" }\n'
 		return
 	}
+	if firmware_signature_required && [ "$validation_signature" != "signed" ]; then
+		printf '{ "ok": false, "error": "signed_validation_required" }\n'
+		return
+	fi
 	case "$keep_settings" in
 		false|0) keep_settings=0 ;;
 		*) keep_settings=1 ;;
