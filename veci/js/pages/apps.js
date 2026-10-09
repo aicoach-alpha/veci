@@ -62,12 +62,17 @@ export default {
 							const installed = Boolean(app.installed);
 							const installable = Boolean(app.installable);
 							const removable = Boolean(app.removable);
-							const status = installed ? badge('Installed', 'success') : installable ? badge('Ready to install', 'info') : badge('Not installed', 'neutral');
-							const action = installed && removable
-								? `<button class="button button-secondary" data-app-action="remove" data-app-id="${escapeHtml(app.id)}" type="button">Remove</button>`
-								: !installed && installable
-									? `<button class="button button-primary" data-app-action="install" data-app-id="${escapeHtml(app.id)}" type="button">Install</button>`
-									: '';
+							const status = installed
+								? badge('Installed', 'success')
+								: installable
+									? badge('Ready to install', 'info')
+									: badge('Not installed', 'neutral');
+							const action =
+								installed && removable
+									? `<button class="button button-secondary" data-app-action="remove" data-app-id="${escapeHtml(app.id)}" type="button">Remove</button>`
+									: !installed && installable
+										? `<button class="button button-primary" data-app-action="install" data-app-id="${escapeHtml(app.id)}" type="button">Install</button>`
+										: '';
 							return `
 								<article class="app-card">
 									<div class="app-card-icon">${escapeHtml((app.name || app.id || '?').slice(0, 1))}</div>
