@@ -75,7 +75,7 @@ export default {
 							<div><span>Revision</span><strong>${escapeHtml(status.revision || '—')}</strong></div>
 							<div><span>Upgrade method</span><strong>sysupgrade image</strong></div>
 						</div>
-						<a class="button button-primary" href="/cgi-bin/luci/admin/system/flash">Manual firmware update</a>
+						<a class="button button-secondary" href="/cgi-bin/luci/admin/system/flash">Manual upload via Expert (temporary fallback)</a>
 					</article>
 
 					<article class="panel">
@@ -94,10 +94,39 @@ export default {
 					</article>
 				</div>
 
+				<div class="content-grid content-grid-2">
+					<article class="panel">
+						<div class="panel-heading">
+							<div><p class="eyebrow">GITHUB CHANNEL</p><h3>Official VeCI firmware</h3></div>
+							${remote ? badge('Checked', 'success') : badge('Not checked', 'neutral')}
+						</div>
+						${remoteSummary}
+						<button id="check-firmware" class="button button-secondary" type="button">Check GitHub release</button>
+					</article>
+
+					<article class="panel">
+						<div class="panel-heading">
+							<div><p class="eyebrow">VALIDATION</p><h3>Staged firmware</h3></div>
+							${ready.ready ? badge('Ready', 'success') : badge('Nothing staged', 'neutral')}
+						</div>
+						${
+							ready.ready
+								? `
+									<div class="detail-list">
+										<div><span>Version</span><strong>${escapeHtml(ready.version || '—')}</strong></div>
+										<div><span>Size</span><strong>${formatBytes(Number(ready.bytes) || 0)}</strong></div>
+										<div><span>SHA256</span><strong class="mono">${escapeHtml(ready.sha256 || '—')}</strong></div>
+									</div>
+									<p class="panel-copy">Checksum and <code>sysupgrade -T</code> validation passed. Apply/flash stays disabled in this stage.</p>
+								`
+								: '<p class="panel-copy">Firmware must pass board, size, SHA256 and <code>sysupgrade -T</code> checks before install can be offered.</p>'
+						}
+					</article>
+				</div>
+
 				<article class="panel">
 					<div class="panel-heading">
-						<div><p class="eyebrow">AUTOMATIC UPDATE</p><h3>VeCI signed update channel</h3></div>
-						${badge('Not enabled yet', 'neutral')}
+						<div><p class="eyebrow">AUTOMATIC UPDATE</p><h3>VeCI signed update channel</h3></div>						${badge('Not enabled yet', 'neutral')}
 					</div>
 					<p class="panel-copy">Automatic download and install will only be enabled after VeCI release metadata and firmware checksums are signed with a dedicated project key. Until then, VeCI will never run a blind package upgrade.</p>
 				</article>
