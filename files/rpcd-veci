@@ -450,7 +450,7 @@ firmware_token() {
 	if [ -r /dev/urandom ] && command -v sha256sum >/dev/null 2>&1; then
 		head -c 32 /dev/urandom 2>/dev/null | sha256sum | awk '{ print $1 }'
 	else
-		printf '%s-%s-%s' "$" "$(date +%s)" "$(firmware_board_name)" | sha256sum | awk '{ print $1 }'
+		printf '%s-%s-%s' "$$" "$(date +%s)" "$(firmware_board_name)" | sha256sum | awk '{ print $1 }'
 	fi
 }
 
@@ -619,7 +619,7 @@ method_firmware_upload_chunk() {
 		return
 	}
 
-	tmp_chunk="/tmp/veci-firmware-chunk.$"
+	tmp_chunk="/tmp/veci-firmware-chunk.$$"
 	if ! printf '%s' "$data" | base64 -d > "$tmp_chunk" 2>/dev/null; then
 		rm -f "$tmp_chunk"
 		printf '{ "ok": false, "error": "invalid_chunk_encoding" }\n'
