@@ -461,6 +461,20 @@ firmware_safe_https_url() {
 	esac
 }
 
+firmware_tmp_has_space() {
+	required="$1"
+	case "$required" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	available_kb="$(df -Pk /tmp 2>/dev/null | awk 'NR==2 { print $4 }')"
+	case "$available_kb" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	available=$((available_kb * 1024))
+	margin=$((1024 * 1024))
+	[ "$available" -ge $((required + margin)) ] 2>/dev/null
+}
+
 firmware_fetch() {
 	url="$1"
 	output="$2"
@@ -580,6 +594,10 @@ method_firmware_upload_start() {
 		printf '{ "ok": false, "error": "firmware_too_large" }\n'
 		return
 	}
+	firmware_tmp_has_space "$size" || {
+		printf '{ "ok": false, "error": "insufficient_staging_space" }\n'
+		return
+	}
 
 	upload_id="$(firmware_token)"
 	rm -f "$firmware_path" "$firmware_validation_meta"
@@ -612,6 +630,10 @@ method_firmware_upload_chunk() {
 	}
 	[ -n "$data" ] || {
 		printf '{ "ok": false, "error": "empty_chunk" }\n'
+		return
+	}
+	[ "${#data}" -le 65536 ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "chunk_too_large" }\n'
 		return
 	}
 	command -v base64 >/dev/null 2>&1 || {
@@ -748,6 +770,10 @@ method_firmware_remote_download() {
 	url="$(firmware_manifest_field firmware_url)"
 	expected_sha="$(firmware_manifest_field sha256)"
 	expected_size="$(firmware_manifest_field size)"
+	firmware_tmp_has_space "$expected_size" || {
+		printf '{ "ok": false, "error": "insufficient_staging_space" }\n'
+		return
+	}
 	rm -f "$firmware_path" "$firmware_validation_meta"
 	if ! firmware_fetch "$url" "$firmware_path"; then
 		rm -f "$firmware_path"
