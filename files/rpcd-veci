@@ -680,6 +680,77 @@ method_firmware_apply() {
 	printf '{ "ok": true, "rebooting": true }\n'
 }
 
+method_firmware_auto_tick() {
+	firmware_auto_check_enabled || {
+		printf '{ "ok": true, "action": "disabled" }\n'
+		return
+	}
+
+	load_firmware_metadata
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		error=$(firmware_metadata_error "$rc")
+		printf '{ "ok": false, "error": "%s" }\n' "$error"
+		return
+	fi
+
+	current_build_id=$(firmware_current_build_id)
+	safe_current=$(clean_token "$current_build_id")
+	[ -n "$current_build_id" ] && [ "$safe_current" = "$current_build_id" ] || {
+		printf '{ "ok": false, "error": "current_build_unknown" }\n'
+		return
+	}
+
+	if [ "$current_build_id" = "$firmware_build_id" ]; then
+		printf '{ "ok": true, "action": "up_to_date", "build_id": "%s" }\n' "$safe_current"
+		return
+	fi
+
+	firmware_auto_download_enabled || {
+		printf '{ "ok": true, "action": "update_available", "version": "%s", "build_id": "%s" }\n' \
+			"$(clean_token "$firmware_version")" "$firmware_build_id"
+		return
+	}
+
+	[ "$firmware_metadata_signed" = true ] || {
+		printf '{ "ok": false, "error": "unsigned_channel_metadata" }\n'
+		return
+	}
+
+	result=/tmp/veci-auto-download-result.json
+	method_firmware_download > "$result"
+	state=$(firmware_state_path)
+	if [ ! -r "$state" ]; then
+		error=$(jsonfilter -i "$result" -e '@.error' 2>/dev/null)
+		[ -n "$error" ] || error='firmware_download_failed'
+		printf '{ "ok": false, "error": "%s" }\n' "$(clean_token "$error")"
+		return
+	fi
+
+	read -r version expected_sha expected_bytes source signed staged_build_id < "$state" || {
+		printf '{ "ok": false, "error": "firmware_state_invalid" }\n'
+		return
+	}
+	[ "$source" = "channel" ] && [ "$signed" = "true" ] && [ "$staged_build_id" = "$firmware_build_id" ] || {
+		method_firmware_cancel >/dev/null
+		printf '{ "ok": false, "error": "staged_firmware_identity_mismatch" }\n'
+		return
+	}
+
+	firmware_auto_install_enabled || {
+		printf '{ "ok": true, "action": "downloaded", "version": "%s", "build_id": "%s" }\n' \
+			"$(clean_token "$version")" "$(clean_token "$staged_build_id")"
+		return
+	}
+
+	firmware_apply_enabled || {
+		printf '{ "ok": false, "error": "firmware_apply_disabled" }\n'
+		return
+	}
+
+	method_firmware_apply
+}
+
 method_firmware_cancel() {
 	rm -f "$(firmware_image_path)" "$(firmware_state_path)" /tmp/veci-upload-chunk.bin /tmp/veci-sysupgrade-test.log
 	printf '{ "ok": true }\n'
@@ -917,7 +988,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareCheck": {}, "firmwareDownload": {}, "firmwareReady": {}, "firmwareUploadStart": {}, "firmwareUploadChunk": { "offset": "int", "data": "str" }, "firmwareUploadFinish": { "bytes": "int", "sha256": "str" }, "firmwareApply": {}, "firmwareCancel": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareCheck": {}, "firmwareDownload": {}, "firmwareReady": {}, "firmwareUploadStart": {}, "firmwareUploadChunk": { "offset": "int", "data": "str" }, "firmwareUploadFinish": { "bytes": "int", "sha256": "str" }, "firmwareApply": {}, "firmwareAutoTick": {}, "firmwareCancel": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -936,6 +1007,7 @@ case "$1" in
 			firmwareUploadChunk) method_firmware_upload_chunk ;;
 			firmwareUploadFinish) method_firmware_upload_finish ;;
 			firmwareApply) method_firmware_apply ;;
+			firmwareAutoTick) method_firmware_auto_tick ;;
 			firmwareCancel) method_firmware_cancel ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
