@@ -59,14 +59,17 @@ export default {
 				<div class="app-grid">
 					${state.apps
 						.map(app => {
+							const enabled = app.enabled !== false;
 							const installed = Boolean(app.installed);
 							const installable = Boolean(app.installable);
 							const removable = Boolean(app.removable);
 							const status = installed
 								? badge('Installed', 'success')
-								: installable
-									? badge('Ready to install', 'info')
-									: badge('Not installed', 'neutral');
+								: !enabled
+									? badge('Not ready', 'warning')
+									: installable
+										? badge('Ready to install', 'info')
+										: badge('Not installed', 'neutral');
 							const action =
 								installed && removable
 									? `<button class="button button-secondary" data-app-action="remove" data-app-id="${escapeHtml(app.id)}" type="button">Remove</button>`
