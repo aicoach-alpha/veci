@@ -148,13 +148,17 @@ export default {
 					</div>
 					<div class="detail-list">
 						<div><span>Manifest</span><strong>${escapeHtml(firmware.manifest_url || 'Firmware profile has not configured a channel')}</strong></div>
-						${remote ? `
+						${
+							remote
+								? `
 							<div><span>Published release</span><strong>${remote.available === false ? 'None yet' : escapeHtml(remote.version || '—')}</strong></div>
 							<div><span>Channel</span><strong>${escapeHtml(remote.channel || '—')}</strong></div>
 							<div><span>Compatibility</span><strong>${remote.compatible ? 'Compatible' : 'Not compatible with this board'}</strong></div>
 							<div><span>Size</span><strong>${formatBytes(remote.size)}</strong></div>
 							<div><span>SHA256</span><strong>${escapeHtml(remote.sha256 ? remote.sha256.slice(0, 16) + '…' : '—')}</strong></div>
-						` : ''}
+						`
+								: ''
+						}
 					</div>
 					<div class="panel-actions">
 						<button id="check-remote" class="button button-secondary" type="button" ${firmware.manifest_url ? '' : 'disabled'}>Check GitHub</button>
@@ -275,10 +279,13 @@ export default {
 				validationToken = '';
 				try {
 					const start = await api.veci('firmwareUploadStart', { filename: file.name, size: file.size });
-					if (!start.ok || !start.upload_id) throw new Error(start.error || 'Could not start firmware upload');
+					if (!start.ok || !start.upload_id)
+						throw new Error(start.error || 'Could not start firmware upload');
 					let sequence = 0;
 					for (let offset = 0; offset < file.size; offset += UPLOAD_CHUNK_BYTES) {
-						const buffer = await file.slice(offset, Math.min(offset + UPLOAD_CHUNK_BYTES, file.size)).arrayBuffer();
+						const buffer = await file
+							.slice(offset, Math.min(offset + UPLOAD_CHUNK_BYTES, file.size))
+							.arrayBuffer();
 						const result = await api.veci(
 							'firmwareUploadChunk',
 							{ upload_id: start.upload_id, sequence, data: chunkToBase64(buffer) },
@@ -286,9 +293,14 @@ export default {
 						);
 						if (!result.ok) throw new Error(result.error || 'Firmware upload failed');
 						sequence += 1;
-						if (progress) progress.textContent = `${Math.min(100, Math.round((result.bytes / file.size) * 100))}%`;
+						if (progress)
+							progress.textContent = `${Math.min(100, Math.round((result.bytes / file.size) * 100))}%`;
 					}
-					const finish = await api.veci('firmwareUploadFinish', { upload_id: start.upload_id }, { timeout: 20000 });
+					const finish = await api.veci(
+						'firmwareUploadFinish',
+						{ upload_id: start.upload_id },
+						{ timeout: 20000 }
+					);
 					if (!finish.ok) throw new Error(finish.error || 'Could not finalize firmware upload');
 					await validateStaged(shaInput);
 				} catch (error) {
