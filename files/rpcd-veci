@@ -411,7 +411,8 @@ firmware_apply_enabled() {
 	[ "$(uci -q get veci.main.firmware_apply_enabled 2>/dev/null)" = "1" ]
 }
 
-firmware_max_bytes() {	value=$(uci -q get veci.main.firmware_max_bytes 2>/dev/null)
+firmware_max_bytes() {
+	value=$(uci -q get veci.main.firmware_max_bytes 2>/dev/null)
 	case "$value" in
 		''|*[!0-9]*) printf '0' ;;
 		*) printf '%s' "$value" ;;
@@ -420,6 +421,23 @@ firmware_max_bytes() {	value=$(uci -q get veci.main.firmware_max_bytes 2>/dev/nu
 
 firmware_live_board() {
 	ubus call system board 2>/dev/null | jsonfilter -e '@.board_name' 2>/dev/null
+}
+
+firmware_current_build_id() {
+	[ -r /etc/veci-release.json ] || return
+	jsonfilter -i /etc/veci-release.json -e '@.build_id' 2>/dev/null
+}
+
+firmware_auto_check_enabled() {
+	[ "$(uci -q get veci.main.firmware_auto_check 2>/dev/null)" = "1" ]
+}
+
+firmware_auto_download_enabled() {
+	[ "$(uci -q get veci.main.firmware_auto_download 2>/dev/null)" = "1" ]
+}
+
+firmware_auto_install_enabled() {
+	[ "$(uci -q get veci.main.firmware_auto_install 2>/dev/null)" = "1" ]
 }
 
 valid_https_url() {
@@ -452,6 +470,7 @@ load_firmware_metadata() {
 	schema=$(jsonfilter -i "$metadata" -e '@.schema' 2>/dev/null)
 	firmware_board=$(jsonfilter -i "$metadata" -e '@.board' 2>/dev/null)
 	firmware_version=$(jsonfilter -i "$metadata" -e '@.version' 2>/dev/null)
+	firmware_build_id=$(jsonfilter -i "$metadata" -e '@.build_id' 2>/dev/null)
 	firmware_url=$(jsonfilter -i "$metadata" -e '@.firmware.url' 2>/dev/null)
 	firmware_sha256=$(jsonfilter -i "$metadata" -e '@.firmware.sha256' 2>/dev/null | tr 'A-F' 'a-f')
 	firmware_bytes=$(jsonfilter -i "$metadata" -e '@.firmware.bytes' 2>/dev/null)
@@ -460,6 +479,8 @@ load_firmware_metadata() {
 
 	[ "$schema" = "1" ] || return 13
 	[ -n "$live_board" ] && [ "$firmware_board" = "$live_board" ] || return 14
+	safe_build_id=$(clean_token "$firmware_build_id")
+	[ -n "$firmware_build_id" ] && [ "$safe_build_id" = "$firmware_build_id" ] || return 24
 	valid_https_url "$firmware_url" || return 15
 	case "$firmware_sha256" in
 		????????????????????????????????????????????????????????????????) ;;
@@ -492,6 +513,7 @@ firmware_metadata_error() {
 		21) printf 'signature_verifier_unavailable' ;;
 		22) printf 'signature_fetch_failed' ;;
 		23) printf 'metadata_signature_invalid' ;;
+		24) printf 'invalid_build_id' ;;
 		*) printf 'invalid_firmware_metadata' ;;
 	esac
 }
@@ -607,7 +629,7 @@ method_firmware_upload_finish() {
 		return
 	fi
 
-	printf '%s %s %s %s %s\n' 'manual-upload' "$actual_sha" "$actual_bytes" 'manual' 'false' > "$state"
+	printf '%s %s %s %s %s %s\n' 'manual-upload' "$actual_sha" "$actual_bytes" 'manual' 'false' 'manual-upload' > "$state"
 	printf '{ "ok": true, "ready": true, "version": "manual-upload", "sha256": "%s", "bytes": %s }\n' "$actual_sha" "$actual_bytes"
 }
 
@@ -623,7 +645,7 @@ method_firmware_apply() {
 		printf '{ "ok": false, "error": "firmware_not_ready" }\n'
 		return
 	}
-	read -r version expected_sha expected_bytes source signed < "$state" || {
+	read -r version expected_sha expected_bytes source signed build_id < "$state" || {
 		printf '{ "ok": false, "error": "firmware_state_invalid" }\n'
 		return
 	}
@@ -677,6 +699,14 @@ method_firmware_check() {
 	json_add_boolean ok 1
 	json_add_string board "$firmware_board"
 	json_add_string version "$firmware_version"
+	json_add_string build_id "$firmware_build_id"
+	current_build_id=$(firmware_current_build_id)
+	json_add_string current_build_id "$(clean_token "$current_build_id")"
+	if [ -n "$current_build_id" ] && [ "$current_build_id" = "$firmware_build_id" ]; then
+		json_add_boolean update_available 0
+	else
+		json_add_boolean update_available 1
+	fi
 	json_add_string url "$firmware_url"
 	json_add_string sha256 "$firmware_sha256"
 	json_add_int bytes "$firmware_bytes"
@@ -722,7 +752,7 @@ method_firmware_download() {
 		return
 	fi
 
-	printf '%s %s %s %s %s\n' "$firmware_version" "$firmware_sha256" "$actual_bytes" 'channel' "$firmware_metadata_signed" > "$state"
+	printf '%s %s %s %s %s %s\n' "$firmware_version" "$firmware_sha256" "$actual_bytes" 'channel' "$firmware_metadata_signed" "$firmware_build_id" > "$state"
 	printf '{ "ok": true, "ready": true, "version": "%s", "sha256": "%s", "bytes": %s }\n' \
 		"$(clean_token "$firmware_version")" "$firmware_sha256" "$actual_bytes"
 }
@@ -734,7 +764,7 @@ method_firmware_ready() {
 		printf '{ "ready": false }\n'
 		return
 	}
-	read -r version expected_sha expected_bytes source signed < "$state" || {
+	read -r version expected_sha expected_bytes source signed build_id < "$state" || {
 		printf '{ "ready": false }\n'
 		return
 	}
@@ -743,8 +773,8 @@ method_firmware_ready() {
 	if [ "$actual_bytes" = "$expected_bytes" ] && [ "$actual_sha" = "$expected_sha" ]; then
 		apply_enabled=false
 		firmware_apply_enabled && apply_enabled=true
-		printf '{ "ready": true, "version": "%s", "sha256": "%s", "bytes": %s, "source": "%s", "signed": %s, "apply_enabled": %s }\n' \
-			"$(clean_token "$version")" "$actual_sha" "$actual_bytes" "$(clean_token "$source")" "$signed" "$apply_enabled"
+		printf '{ "ready": true, "version": "%s", "build_id": "%s", "sha256": "%s", "bytes": %s, "source": "%s", "signed": %s, "apply_enabled": %s }\n' \
+			"$(clean_token "$version")" "$(clean_token "$build_id")" "$actual_sha" "$actual_bytes" "$(clean_token "$source")" "$signed" "$apply_enabled"
 	else
 		rm -f "$image" "$state"
 		printf '{ "ready": false }\n'
