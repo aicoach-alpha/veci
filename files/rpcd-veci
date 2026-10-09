@@ -382,7 +382,12 @@ EOF
 	rc=1
 	case "$manager:$action" in
 		apk:install)
-			apk -U add "$@" >/tmp/veci-app-action.log 2>&1
+			repositories='/etc/apk/repositories.d/veci-apps.list'
+			[ -r "$repositories" ] || {
+				printf '{ "ok": false, "error": "app_feed_repositories_missing" }\n'
+				return
+			}
+			apk -U add --repositories-file "$repositories" "$@" >/tmp/veci-app-action.log 2>&1
 			rc=$?
 			;;
 		apk:remove)
