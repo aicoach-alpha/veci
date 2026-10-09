@@ -178,8 +178,55 @@ export default {
 				}
 			});
 
-			const check = root.querySelector('#check-firmware');
-			check?.addEventListener('click', async () => {
+			const upload = root.querySelector('#upload-manual-firmware');
+			const fileInput = root.querySelector('#manual-firmware-file');
+			upload?.addEventListener('click', async () => {
+				const file = fileInput?.files?.[0];
+				if (!file) {
+					toast('Choose a sysupgrade .bin file first.', 'error');
+					return;
+				}
+
+				setBusy(upload, true, 'Preparing…');
+				try {
+					const start = await api.veci('firmwareUploadStart', {}, { timeout: 10000 });
+					if (!start.ok) throw new Error(start.error || 'Could not start firmware upload');
+					const maxBytes = Number(start.max_bytes) || 0;
+					const chunkBytes = Number(start.chunk_bytes) || 32768;
+					if (maxBytes > 0 && file.size > maxBytes) throw new Error('Firmware image exceeds this router profile limit');
+
+					upload.textContent = 'Calculating SHA256…';
+					const sha256 = await sha256File(file);
+					let offset = 0;
+					while (offset < file.size) {
+						const buffer = await file.slice(offset, offset + chunkBytes).arrayBuffer();
+						const data = bytesToBase64(new Uint8Array(buffer));
+						const result = await api.veci('firmwareUploadChunk', { offset, data }, { timeout: 30000 });
+						if (!result.ok) throw new Error(result.error || 'Firmware upload failed');
+						offset = Number(result.next_offset);
+						if (!Number.isFinite(offset)) throw new Error('Router returned an invalid upload offset');
+						const percent = Math.min(100, Math.round((offset / file.size) * 100));
+						upload.textContent = `Uploading ${percent}%…`;
+					}
+
+					upload.textContent = 'Validating…';
+					const finish = await api.veci(
+						'firmwareUploadFinish',
+						{ bytes: file.size, sha256 },
+						{ timeout: 60000 }
+					);
+					if (!finish.ok) throw new Error(finish.error || 'Firmware validation failed');
+					[, ready] = await loadStatus();
+					draw();
+					toast('Manual firmware passed SHA256 and sysupgrade validation.', 'success');
+				} catch (error) {
+					await api.veci('firmwareCancel', {}, { timeout: 10000 }).catch(() => {});
+					toast(error.message || 'Could not upload firmware.', 'error');
+					setBusy(upload, false);
+				}
+			});
+
+			const check = root.querySelector('#check-firmware');			check?.addEventListener('click', async () => {
 				setBusy(check, true, 'Checking…');
 				try {
 					const result = await api.veci('firmwareCheck', {}, { timeout: 30000 });
