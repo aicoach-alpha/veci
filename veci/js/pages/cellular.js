@@ -86,6 +86,10 @@ export default {
 					<div class="detail-list">
 						${metric('Active SIM', sim)}
 						${metric('SIM status', status.sim_status)}
+						<div class="detail-list-item" id="cellular-imei-row">
+							<span>Modem IMEI (AT cache)</span>
+							<strong id="cellular-imei-value">Hidden</strong>
+						</div>
 						${metric('IPv4', status.ipv4)}
 						${metric('Gateway', status.gateway)}
 						${metric('Data interface', status.data_interface)}
@@ -93,6 +97,7 @@ export default {
 						<div id="cellular-internet-status"><span>Internet</span><strong>${online ? 'Checking…' : 'Unavailable'}</strong></div>
 					</div>
 					<div class="cellular-actions">
+						<button class="button button-secondary" id="cellular-imei-toggle" type="button">Show IMEI</button>
 						<button class="button button-secondary" id="cellular-reconnect" type="button">Reconnect data</button>
 						${status.sim !== undefined ? '<button class="button button-secondary" id="cellular-switch-sim" type="button">Switch SIM</button>' : ''}
 					</div>
@@ -100,8 +105,9 @@ export default {
 			</div>
 
 			<div class="notice-card">
-				<strong>Hardware-aware integration</strong>
-				<p>VeCI Core does not assume a specific modem or router. This page appears only when the firmware exposes the standard <code>veci.cellular</code> provider.</p>
+				<strong>IMEI source: router LTE modem's AT cache</strong>
+				<p>Identity is hidden until requested, is not stored by VeCI, and can be stale. The W907-EC MiFi web interface may use a different source. A mismatch requires verification at the modem; VeCI never changes the IMEI.</p>
+				<p>VeCI Core remains hardware-independent. This page is available when the router exposes <code>veci.cellular</code>.</p>
 			</div>
 		`;
 
@@ -120,6 +126,47 @@ export default {
 					if (value) value.textContent = 'Not verified';
 				});
 		}
+
+		const imeiButton = root.querySelector('#cellular-imei-toggle');
+		let imeiVisible = false;
+		let identityHideTimer;
+		imeiButton?.addEventListener('click', async () => {
+			const valueElement = root.querySelector('#cellular-imei-value');
+			if (!valueElement) return;
+			if (imeiVisible) {
+				valueElement.textContent = 'Hidden';
+				imeiButton.textContent = 'Show IMEI';
+				imeiVisible = false;
+				clearTimeout(identityHideTimer);
+				return;
+			}
+			setBusy(imeiButton, true, 'Reading…');
+			try {
+				const identity = await api.call('veci.cellular', 'identity', {}, { timeout: 10000 });
+				const imei = String(identity.imei || '');
+				if (!identity.available || !/^\\d{15}$/.test(imei)) {
+					valueElement.textContent = 'Not available';
+					toast('No valid 15-digit IMEI was returned by the router modem cache.', 'warning');
+					return;
+				}
+				const age = Number(identity.cache_age_seconds);
+				const freshness = Number.isInteger(age) && age >= 0 ? ` · cached ${age}s ago` : ' · cache age unknown';
+				valueElement.textContent = imei + freshness + (identity.stale ? ' (stale)' : '');
+				imeiButton.textContent = 'Hide IMEI';
+				imeiVisible = true;
+				clearTimeout(identityHideTimer);
+				identityHideTimer = setTimeout(() => {
+					valueElement.textContent = 'Hidden';
+					imeiButton.textContent = 'Show IMEI';
+					imeiVisible = false;
+				}, 60000);
+			} catch (error) {
+				toast(error.message || 'Could not read the modem IMEI.', 'error');
+			} finally {
+				setBusy(imeiButton, false);
+				if (imeiVisible) imeiButton.textContent = 'Hide IMEI';
+			}
+		});
 
 		const reconnect = root.querySelector('#cellular-reconnect');
 		reconnect?.addEventListener('click', async () => {
