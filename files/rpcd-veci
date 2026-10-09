@@ -266,10 +266,15 @@ method_apps() {
 		name=$(jsonfilter -i "$manifest" -e '@.name' 2>/dev/null)
 		description=$(jsonfilter -i "$manifest" -e '@.description' 2>/dev/null)
 		tier=$(jsonfilter -i "$manifest" -e '@.tier' 2>/dev/null)
+		enabled_value=$(jsonfilter -i "$manifest" -e '@.enabled' 2>/dev/null)
 		id=$(clean_token "$id")
 		name=$(clean_text "$name")
 		description=$(clean_text "$description")
 		tier=$(clean_token "$tier")
+		case "$enabled_value" in
+			false|0) enabled=false ;;
+			*) enabled=true ;;
+		esac
 		[ -n "$id" ] || continue
 
 		installed=true
@@ -288,11 +293,11 @@ EOF
 		[ -n "$(manifest_remove_packages "$manifest")" ] && removable=true
 
 		installable=false
-		if [ "$installed" = false ] && [ "$feed_enabled" = true ] && [ "$manager" != "none" ]; then
+		if [ "$enabled" = true ] && [ "$installed" = false ] && [ "$feed_enabled" = true ] && [ "$manager" != "none" ]; then
 			installable=true
 		fi
 
-		item="{ \"id\": \"$id\", \"name\": \"$name\", \"description\": \"$description\", \"tier\": \"$tier\", \"packages\": [ $packages ], \"installed\": $installed, \"installable\": $installable, \"removable\": $removable }"
+		item="{ \"id\": \"$id\", \"name\": \"$name\", \"description\": \"$description\", \"tier\": \"$tier\", \"packages\": [ $packages ], \"enabled\": $enabled, \"installed\": $installed, \"installable\": $installable, \"removable\": $removable }"
 		items="${items:+$items, }$item"
 	done
 
@@ -324,6 +329,13 @@ method_app_action() {
 
 	case "$action" in
 		install)
+			enabled_value=$(jsonfilter -i "$manifest" -e '@.enabled' 2>/dev/null)
+			case "$enabled_value" in
+				false|0)
+					printf '{ "ok": false, "error": "app_disabled" }\n'
+					return
+					;;
+			esac
 			app_feed_enabled || {
 				printf '{ "ok": false, "error": "app_feed_disabled" }\n'
 				return
