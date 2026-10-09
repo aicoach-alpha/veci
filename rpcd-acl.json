@@ -63,6 +63,10 @@
 				"veci": [
 					"appAction",
 					"firmwareDownload",
+					"firmwareCancel",
+					"firmwareUploadFinish",
+					"firmwareUploadChunk",
+					"firmwareUploadStart",
 					"serviceAction",
 					"wifiReload",
 					"setAdminPassword"
