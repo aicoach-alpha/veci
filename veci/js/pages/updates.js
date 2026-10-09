@@ -39,9 +39,10 @@ export default {
 		const loadStatus = async () =>
 			Promise.all([
 				api.veci('updateStatus', {}, { timeout: 10000 }).catch(() => ({})),
-				api.veci('firmwareReady', {}, { timeout: 10000 }).catch(() => ({ ready: false }))
+				api.veci('firmwareReady', {}, { timeout: 10000 }).catch(() => ({ ready: false })),
+				api.uciGet('veci').catch(() => ({ values: {} }))
 			]);
-		let [status, ready] = await loadStatus();
+		let [status, ready, veciConfig] = await loadStatus();
 		let remote = null;
 
 		const draw = () => {
@@ -52,6 +53,17 @@ export default {
 			const snapshotWarning = channel === 'snapshot' || channel === 'mixed';
 			const kernelFeedMismatch = Boolean(status.kernel_feed_mismatch);
 			const customFeed = Boolean(status.custom_feed_configured);
+			const veciEntries = Object.entries(veciConfig.values || {});
+			const mainEntry =
+				veciEntries.find(([name]) => name === 'main') || veciEntries.find(([, value]) => value['.type'] === 'core');
+			const mainSection = mainEntry?.[0] || null;
+			const mainConfig = mainEntry?.[1] || {};
+			const autoCheck = mainConfig.firmware_auto_check === '1';
+			const autoDownload = mainConfig.firmware_auto_download === '1';
+			const autoInstall = mainConfig.firmware_auto_install === '1';
+			const autoInterval = String(mainConfig.firmware_auto_interval_hours || '24');
+			const signatureConfigured = Boolean(status.firmware_signature_configured);
+			const applyProfileEnabled = Boolean(status.firmware_apply_enabled);
 
 			const remoteSummary = remote
 				? `
@@ -151,9 +163,38 @@ export default {
 
 				<article class="panel">
 					<div class="panel-heading">
-						<div><p class="eyebrow">AUTOMATIC UPDATE</p><h3>VeCI signed update channel</h3></div>						${badge('Not enabled yet', 'neutral')}
+						<div><p class="eyebrow">AUTOMATIC UPDATE</p><h3>VeCI signed update channel</h3></div>
+						${autoCheck ? badge('Scheduled', 'success') : badge('Off', 'neutral')}
 					</div>
-					<p class="panel-copy">Automatic download and install will only be enabled after VeCI release metadata and firmware checksums are signed with a dedicated project key. Until then, VeCI will never run a blind package upgrade.</p>
+					<form id="auto-update-form">
+						<label class="field">
+							<span>Check automatically</span>
+							<input id="auto-update-check" type="checkbox" ${autoCheck ? 'checked' : ''} />
+						</label>
+						<label class="field">
+							<span>Check interval</span>
+							<select id="auto-update-interval">
+								${['1', '6', '12', '24', '48', '72', '168']
+									.map(hours => `<option value="${hours}" ${hours === autoInterval ? 'selected' : ''}>${hours} hour${hours === '1' ? '' : 's'}</option>`)
+									.join('')}
+							</select>
+						</label>
+						<label class="field">
+							<span>Download verified firmware automatically</span>
+							<input id="auto-update-download" type="checkbox" ${autoDownload ? 'checked' : ''} ${signatureConfigured ? '' : 'disabled'} />
+						</label>
+						<label class="field">
+							<span>Install and reboot automatically</span>
+							<input id="auto-update-install" type="checkbox" ${autoInstall ? 'checked' : ''} ${signatureConfigured && applyProfileEnabled ? '' : 'disabled'} />
+						</label>
+						<div class="detail-list">
+							<div><span>Release signature</span><strong>${signatureConfigured ? 'Configured' : 'Required for auto-download'}</strong></div>
+							<div><span>Firmware apply gate</span><strong>${applyProfileEnabled ? 'Enabled by profile' : 'Locked by profile'}</strong></div>
+							<div><span>Current build ID</span><strong class="mono">${escapeHtml(status.current_build_id || 'Not available yet')}</strong></div>
+						</div>
+						<button id="save-auto-update" class="button button-primary" type="submit">Save automatic update settings</button>
+					</form>
+					<p class="panel-copy">Automatic install still requires signed release metadata, a different build ID, a matching board, SHA256 verification and a fresh <code>sysupgrade -T</code> pass. VeCI never runs <code>apk upgrade</code>.</p>
 				</article>
 
 				<div class="notice-card">
@@ -178,7 +219,7 @@ export default {
 			refresh?.addEventListener('click', async () => {
 				setBusy(refresh, true, 'Checking…');
 				try {
-					[status, ready] = await loadStatus();
+					[status, ready, veciConfig] = await loadStatus();
 					draw();
 					toast('Update status refreshed.', 'success');
 				} catch (error) {
@@ -187,8 +228,56 @@ export default {
 				}
 			});
 
-			const upload = root.querySelector('#upload-manual-firmware');
-			const fileInput = root.querySelector('#manual-firmware-file');
+			const autoForm = root.querySelector('#auto-update-form');
+			autoForm?.addEventListener('submit', async event => {
+				event.preventDefault();
+				const button = root.querySelector('#save-auto-update');
+				if (!mainSection) {
+					toast('VeCI core configuration section was not found.', 'error');
+					return;
+				}
+
+				const nextCheck = root.querySelector('#auto-update-check').checked;
+				const nextInterval = root.querySelector('#auto-update-interval').value;
+				const nextDownload = signatureConfigured && root.querySelector('#auto-update-download').checked;
+				const nextInstall =
+					signatureConfigured && applyProfileEnabled && root.querySelector('#auto-update-install').checked;
+
+				if (nextInstall && !nextDownload) {
+					toast('Automatic install requires automatic download.', 'error');
+					return;
+				}
+
+				if (nextInstall && !autoInstall) {
+					const allowed = await confirm({
+						title: 'Enable automatic firmware install?',
+						message:
+							'When a newer signed build passes all safety checks, the router may install it and reboot without another confirmation.',
+						confirmLabel: 'Enable auto-install',
+						tone: 'danger'
+					});
+					if (!allowed) return;
+				}
+
+				setBusy(button, true, 'Saving…');
+				try {
+					await api.uciSet('veci', mainSection, {
+						firmware_auto_check: nextCheck ? '1' : '0',
+						firmware_auto_interval_hours: nextInterval,
+						firmware_auto_download: nextDownload ? '1' : '0',
+						firmware_auto_install: nextInstall ? '1' : '0'
+					});
+					await api.uciCommit('veci');
+					[status, ready, veciConfig] = await loadStatus();
+					draw();
+					toast('Automatic update settings saved.', 'success');
+				} catch (error) {
+					toast(error.message || 'Could not save automatic update settings.', 'error');
+					setBusy(button, false);
+				}
+			});
+
+			const upload = root.querySelector('#upload-manual-firmware');			const fileInput = root.querySelector('#manual-firmware-file');
 			upload?.addEventListener('click', async () => {
 				const file = fileInput?.files?.[0];
 				if (!file) {
@@ -226,7 +315,7 @@ export default {
 						{ timeout: 60000 }
 					);
 					if (!finish.ok) throw new Error(finish.error || 'Firmware validation failed');
-					[, ready] = await loadStatus();
+					[, ready, veciConfig] = await loadStatus();
 					draw();
 					toast('Manual firmware passed SHA256 and sysupgrade validation.', 'success');
 				} catch (error) {
@@ -287,7 +376,7 @@ export default {
 				try {
 					const result = await api.veci('firmwareDownload', {}, { timeout: 180000 });
 					if (!result.ok) throw new Error(result.error || 'Firmware validation failed');
-					[, ready] = await loadStatus();
+					[, ready, veciConfig] = await loadStatus();
 					draw();
 					toast('Firmware downloaded, checksum verified and sysupgrade test passed.', 'success');
 				} catch (error) {
