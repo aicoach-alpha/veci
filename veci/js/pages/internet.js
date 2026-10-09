@@ -79,7 +79,7 @@ export default {
 						escapeHtml(iface.interface) +
 						'" type="button">Internet settings</button>';
 				}
-				if (isUplink(iface)) {
+				if (isUplink(iface) && !cellular) {
 					actions +=
 						'<button class="button button-secondary" data-iface="' +
 						escapeHtml(iface.interface) +
