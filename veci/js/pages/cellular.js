@@ -5,6 +5,21 @@ function metric(label, value, suffix = '') {
 	return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(display)}</strong></div>`;
 }
 
+function normalizeOperator(value) {
+	const text = String(value || '').trim();
+	if (!text) return 'No operator';
+
+	const parts = text.split(/\s+/);
+	if (parts.length % 2 === 0) {
+		const half = parts.length / 2;
+		const first = parts.slice(0, half).join(' ');
+		const second = parts.slice(half).join(' ');
+		if (first.toLowerCase() === second.toLowerCase()) return first;
+	}
+
+	return text;
+}
+
 export default {
 	id: 'cellular',
 	title: 'Cellular',
@@ -21,7 +36,7 @@ export default {
 		const online = status.online === true || status.online === 1 || status.online === '1';
 		const sim = status.sim || '—';
 		const model = status.model || status.manufacturer || 'Cellular modem';
-		const operator = status.operator || 'No operator';
+		const operator = normalizeOperator(status.operator);
 		const technology = status.access_tech || status.registration_status || 'Unknown';
 
 		root.innerHTML = `
