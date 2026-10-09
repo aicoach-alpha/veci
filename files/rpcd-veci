@@ -174,7 +174,7 @@ $(cat "$repo_file" 2>/dev/null)"
 	fi
 
 	if command -v apk >/dev/null 2>&1; then
-		tmp="/tmp/veci-upgradeable.$"
+		tmp="/tmp/veci-upgradeable.$$"
 		apk list --upgradeable > "$tmp" 2>/dev/null || true
 		while IFS= read -r line; do
 			[ -n "$line" ] || continue
