@@ -380,6 +380,20 @@ EOF
 	}
 
 	rc=1
+	if [ "$action" = "remove" ]; then
+		provider="veci.app.$id"
+		if ubus list 2>/dev/null | grep -qx "$provider"; then
+			cleanup="$(ubus call "$provider" cleanup '{}' 2>/dev/null || true)"
+			if [ -n "$cleanup" ]; then
+				cleanup_ok="$(printf '%s' "$cleanup" | jsonfilter -e '@.ok' 2>/dev/null)"
+				[ "$cleanup_ok" = "true" ] || {
+					printf '{ "ok": false, "error": "app_cleanup_failed", "id": "%s" }\n' "$id"
+					return
+				}
+			fi
+		fi
+	fi
+
 	case "$manager:$action" in
 		apk:install)
 			repositories='/etc/apk/repositories.d/veci-apps.list'
