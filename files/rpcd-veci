@@ -524,6 +524,20 @@ method_firmware_status() {
 	[ "$(uci -q get veci.update.auto_check 2>/dev/null)" = "1" ] && json_add_boolean auto_check 1 || json_add_boolean auto_check 0
 	[ "$(uci -q get veci.update.auto_download 2>/dev/null)" = "1" ] && json_add_boolean auto_download 1 || json_add_boolean auto_download 0
 	[ "$(uci -q get veci.update.auto_install 2>/dev/null)" = "1" ] && json_add_boolean auto_install 1 || json_add_boolean auto_install 0
+	check_interval="$(uci -q get veci.update.check_interval 2>/dev/null || printf '21600')"
+	case "$check_interval" in ''|*[!0-9]*) check_interval=21600 ;; esac
+	json_add_int check_interval "$check_interval"
+	if [ -r /tmp/veci-update-agent.status ]; then
+		read -r last_check auto_state auto_detail < /tmp/veci-update-agent.status || true
+		case "$last_check" in ''|*[!0-9]*) last_check=0 ;; esac
+		json_add_int auto_last_check "$last_check"
+		json_add_string auto_state "$(clean_token "$auto_state")"
+		json_add_string auto_detail "$(clean_token "$auto_detail")"
+	else
+		json_add_int auto_last_check 0
+		json_add_string auto_state "not_run"
+		json_add_string auto_detail ""
+	fi
 	json_dump
 }
 
