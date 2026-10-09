@@ -90,6 +90,14 @@ export default {
 							<span>Modem IMEI (AT cache)</span>
 							<strong id="cellular-imei-value">Hidden</strong>
 						</div>
+						<div class="detail-list-item" id="cellular-imei-live-row">
+							<span>Live modem IMEI (AT+CGSN)</span>
+							<strong id="cellular-imei-live-value">Not checked</strong>
+						</div>
+						<div class="detail-list-item">
+							<span>Cached vs live</span>
+							<strong id="cellular-imei-comparison">Not compared</strong>
+						</div>
 						${metric('IPv4', status.ipv4)}
 						${metric('Gateway', status.gateway)}
 						${metric('Data interface', status.data_interface)}
@@ -97,7 +105,8 @@ export default {
 						<div id="cellular-internet-status"><span>Internet</span><strong>${online ? 'Checking…' : 'Unavailable'}</strong></div>
 					</div>
 					<div class="cellular-actions">
-						<button class="button button-secondary" id="cellular-imei-toggle" type="button">Show IMEI</button>
+						<button class="button button-secondary" id="cellular-imei-toggle" type="button">Show cached IMEI</button>
+						<button class="button button-secondary" id="cellular-imei-live" type="button">Read live AT IMEI</button>
 						<button class="button button-secondary" id="cellular-reconnect" type="button">Reconnect data</button>
 						${status.sim !== undefined ? '<button class="button button-secondary" id="cellular-switch-sim" type="button">Switch SIM</button>' : ''}
 					</div>
@@ -105,8 +114,8 @@ export default {
 			</div>
 
 			<div class="notice-card">
-				<strong>IMEI source: router LTE modem's AT cache</strong>
-				<p>Identity is hidden until requested, is not stored by VeCI, and can be stale. The W907-EC MiFi web interface may use a different source. A mismatch requires verification at the modem; VeCI never changes the IMEI.</p>
+				<strong>Modem identity diagnostics (on demand)</strong>
+				<p>Cached identity comes from the router LTE manager and can be stale. Live identity uses the AT+CGSN read-only query on the connected modem. Both values are revealed only when requested, are hidden after 60 seconds, and are never saved by VeCI. The separate MiFi web interface may report a different device or data source; a mismatch must be investigated before drawing conclusions. VeCI never changes the IMEI.</p>
 				<p>VeCI Core remains hardware-independent. This page is available when the router exposes <code>veci.cellular</code>.</p>
 			</div>
 		`;
@@ -128,16 +137,42 @@ export default {
 		}
 
 		const imeiButton = root.querySelector('#cellular-imei-toggle');
-		let imeiVisible = false;
+		const liveButton = root.querySelector('#cellular-imei-live');
+		const cachedValue = root.querySelector('#cellular-imei-value');
+		const liveValue = root.querySelector('#cellular-imei-live-value');
+		const comparisonValue = root.querySelector('#cellular-imei-comparison');
+		let cachedImei = '';
+		let liveImei = '';
 		let identityHideTimer;
+
+		const refreshComparison = () => {
+			if (cachedImei && liveImei) {
+				comparisonValue.textContent =
+					cachedImei === liveImei ? 'Match — same reported IMEI' : 'Mismatch — investigate modem source';
+			} else {
+				comparisonValue.textContent = 'Not compared';
+			}
+		};
+
+		const hideIdentities = () => {
+			cachedImei = '';
+			liveImei = '';
+			cachedValue.textContent = 'Hidden';
+			liveValue.textContent = 'Hidden';
+			imeiButton.textContent = 'Show cached IMEI';
+			liveButton.textContent = 'Read live AT IMEI';
+			refreshComparison();
+			clearTimeout(identityHideTimer);
+		};
+
+		const scheduleHide = () => {
+			clearTimeout(identityHideTimer);
+			identityHideTimer = setTimeout(hideIdentities, 60000);
+		};
+
 		imeiButton?.addEventListener('click', async () => {
-			const valueElement = root.querySelector('#cellular-imei-value');
-			if (!valueElement) return;
-			if (imeiVisible) {
-				valueElement.textContent = 'Hidden';
-				imeiButton.textContent = 'Show IMEI';
-				imeiVisible = false;
-				clearTimeout(identityHideTimer);
+			if (cachedImei) {
+				hideIdentities();
 				return;
 			}
 			setBusy(imeiButton, true, 'Reading…');
@@ -145,26 +180,47 @@ export default {
 				const identity = await api.call('veci.cellular', 'identity', {}, { timeout: 10000 });
 				const imei = String(identity.imei || '');
 				if (!identity.available || !/^[0-9]{15}$/.test(imei)) {
-					valueElement.textContent = 'Not available';
-					toast('No valid 15-digit IMEI was returned by the router modem cache.', 'warning');
+					cachedValue.textContent = 'Not available';
+					toast('Router modem cache has no valid 15-digit IMEI.', 'warning');
 					return;
 				}
 				const age = Number(identity.cache_age_seconds);
-				const freshness = Number.isInteger(age) && age >= 0 ? ` · cached ${age}s ago` : ' · cache age unknown';
-				valueElement.textContent = imei + freshness + (identity.stale ? ' (stale)' : '');
-				imeiButton.textContent = 'Hide IMEI';
-				imeiVisible = true;
-				clearTimeout(identityHideTimer);
-				identityHideTimer = setTimeout(() => {
-					valueElement.textContent = 'Hidden';
-					imeiButton.textContent = 'Show IMEI';
-					imeiVisible = false;
-				}, 60000);
+				const freshness = Number.isInteger(age) && age >= 0 ? ` · cache age ${age}s` : ' · cache age unknown';
+				cachedImei = imei;
+				cachedValue.textContent = imei + freshness + (identity.stale ? ' (stale)' : '');
+				refreshComparison();
+				scheduleHide();
 			} catch (error) {
-				toast(error.message || 'Could not read the modem IMEI.', 'error');
+				toast(error.message || 'Unable to read cached modem IMEI.', 'error');
 			} finally {
 				setBusy(imeiButton, false);
-				if (imeiVisible) imeiButton.textContent = 'Hide IMEI';
+				if (cachedImei) imeiButton.textContent = 'Hide identities';
+			}
+		});
+
+		liveButton?.addEventListener('click', async () => {
+			setBusy(liveButton, true, 'Querying modem…');
+			try {
+				const identity = await api.call('veci.cellular', 'identityLive', {}, { timeout: 10000 });
+				const imei = String(identity.imei || '');
+				if (!identity.available || !/^[0-9]{15}$/.test(imei)) {
+					liveImei = '';
+					liveValue.textContent = 'Not available';
+					refreshComparison();
+					toast('The modem did not return a valid live IMEI.', 'warning');
+					return;
+				}
+				liveImei = imei;
+				liveValue.textContent = imei + ' · direct AT read';
+				refreshComparison();
+				scheduleHide();
+			} catch (error) {
+				liveImei = '';
+				liveValue.textContent = 'Unavailable (AT port busy or offline)';
+				refreshComparison();
+				toast(error.message || 'Live AT identity request failed.', 'error');
+			} finally {
+				setBusy(liveButton, false);
 			}
 		});
 
