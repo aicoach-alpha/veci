@@ -399,6 +399,14 @@ firmware_channel_url() {
 	uci -q get veci.main.firmware_channel_url 2>/dev/null
 }
 
+firmware_channel_sig_url() {
+	uci -q get veci.main.firmware_channel_sig_url 2>/dev/null
+}
+
+firmware_channel_pubkey() {
+	uci -q get veci.main.firmware_channel_pubkey 2>/dev/null
+}
+
 firmware_max_bytes() {
 	value=$(uci -q get veci.main.firmware_max_bytes 2>/dev/null)
 	case "$value" in
@@ -426,6 +434,18 @@ load_firmware_metadata() {
 	metadata=/tmp/veci-firmware-channel.json
 	wget -qO "$metadata" "$channel_url" || return 12
 
+	firmware_metadata_signed=false
+	sig_url=$(firmware_channel_sig_url)
+	pubkey=$(firmware_channel_pubkey)
+	if [ -n "$sig_url" ] || [ -n "$pubkey" ]; then
+		[ -n "$sig_url" ] && [ -n "$pubkey" ] || return 19
+		valid_https_url "$sig_url" || return 20
+		[ -r "$pubkey" ] && command -v usign >/dev/null 2>&1 || return 21
+		signature=/tmp/veci-firmware-channel.sig
+		wget -qO "$signature" "$sig_url" || return 22
+		usign -V -p "$pubkey" -m "$metadata" -x "$signature" >/dev/null 2>&1 || return 23
+		firmware_metadata_signed=true
+	fi
 	schema=$(jsonfilter -i "$metadata" -e '@.schema' 2>/dev/null)
 	firmware_board=$(jsonfilter -i "$metadata" -e '@.board' 2>/dev/null)
 	firmware_version=$(jsonfilter -i "$metadata" -e '@.version' 2>/dev/null)
@@ -464,6 +484,11 @@ firmware_metadata_error() {
 		16) printf 'invalid_firmware_checksum' ;;
 		17) printf 'invalid_firmware_size' ;;
 		18) printf 'firmware_too_large' ;;
+		19) printf 'incomplete_signature_config' ;;
+		20) printf 'invalid_signature_url' ;;
+		21) printf 'signature_verifier_unavailable' ;;
+		22) printf 'signature_fetch_failed' ;;
+		23) printf 'metadata_signature_invalid' ;;
 		*) printf 'invalid_firmware_metadata' ;;
 	esac
 }
@@ -579,7 +604,7 @@ method_firmware_upload_finish() {
 		return
 	fi
 
-	printf '%s %s %s\n' 'manual-upload' "$actual_sha" "$actual_bytes" > "$state"
+	printf '%s %s %s %s %s\n' 'manual-upload' "$actual_sha" "$actual_bytes" 'manual' 'false' > "$state"
 	printf '{ "ok": true, "ready": true, "version": "manual-upload", "sha256": "%s", "bytes": %s }\n' "$actual_sha" "$actual_bytes"
 }
 
@@ -605,6 +630,7 @@ method_firmware_check() {
 	json_add_string url "$firmware_url"
 	json_add_string sha256 "$firmware_sha256"
 	json_add_int bytes "$firmware_bytes"
+	[ "$firmware_metadata_signed" = true ] && json_add_boolean signed 1 || json_add_boolean signed 0
 	json_add_string release_notes "$firmware_notes"
 	json_dump
 }
@@ -646,7 +672,7 @@ method_firmware_download() {
 		return
 	fi
 
-	printf '%s %s %s\n' "$firmware_version" "$firmware_sha256" "$actual_bytes" > "$state"
+	printf '%s %s %s %s %s\n' "$firmware_version" "$firmware_sha256" "$actual_bytes" 'channel' "$firmware_metadata_signed" > "$state"
 	printf '{ "ok": true, "ready": true, "version": "%s", "sha256": "%s", "bytes": %s }\n' \
 		"$(clean_token "$firmware_version")" "$firmware_sha256" "$actual_bytes"
 }
@@ -658,15 +684,15 @@ method_firmware_ready() {
 		printf '{ "ready": false }\n'
 		return
 	}
-	read -r version expected_sha expected_bytes < "$state" || {
+	read -r version expected_sha expected_bytes source signed < "$state" || {
 		printf '{ "ready": false }\n'
 		return
 	}
 	actual_bytes=$(wc -c < "$image" | tr -d '[:space:]')
 	actual_sha=$(sha256sum "$image" 2>/dev/null | awk '{ print $1 }' | tr 'A-F' 'a-f')
 	if [ "$actual_bytes" = "$expected_bytes" ] && [ "$actual_sha" = "$expected_sha" ]; then
-		printf '{ "ready": true, "version": "%s", "sha256": "%s", "bytes": %s }\n' \
-			"$(clean_token "$version")" "$actual_sha" "$actual_bytes"
+		printf '{ "ready": true, "version": "%s", "sha256": "%s", "bytes": %s, "source": "%s", "signed": %s }\n' \
+			"$(clean_token "$version")" "$actual_sha" "$actual_bytes" "$(clean_token "$source")" "$signed"
 	else
 		rm -f "$image" "$state"
 		printf '{ "ready": false }\n'
