@@ -432,6 +432,33 @@ firmware_auto_check_enabled() {
 	[ "$(uci -q get veci.main.firmware_auto_check 2>/dev/null)" = "1" ]
 }
 
+firmware_auto_interval_seconds() {
+	hours=$(uci -q get veci.main.firmware_auto_interval_hours 2>/dev/null)
+	case "$hours" in
+		''|*[!0-9]*) hours=24 ;;
+	esac
+	[ "$hours" -ge 1 ] 2>/dev/null || hours=1
+	[ "$hours" -le 168 ] 2>/dev/null || hours=168
+	printf '%s' "$((hours * 3600))"
+}
+
+firmware_auto_due() {
+	now=$(date +%s)
+	interval=$(firmware_auto_interval_seconds)
+	stamp=/tmp/veci-firmware-auto-last
+	if [ -r "$stamp" ]; then
+		read -r last < "$stamp" || last=0
+		case "$last" in
+			''|*[!0-9]*) last=0 ;;
+		esac
+		age=$((now - last))
+		[ "$age" -lt 0 ] && age=0
+		[ "$age" -ge "$interval" ] || return 1
+	fi
+	printf '%s\n' "$now" > "$stamp"
+	return 0
+}
+
 firmware_auto_download_enabled() {
 	[ "$(uci -q get veci.main.firmware_auto_download 2>/dev/null)" = "1" ]
 }
@@ -683,6 +710,11 @@ method_firmware_apply() {
 method_firmware_auto_tick() {
 	firmware_auto_check_enabled || {
 		printf '{ "ok": true, "action": "disabled" }\n'
+		return
+	}
+
+	firmware_auto_due || {
+		printf '{ "ok": true, "action": "not_due" }\n'
 		return
 	}
 
