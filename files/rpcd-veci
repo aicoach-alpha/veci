@@ -212,6 +212,15 @@ $(cat "$repo_file" 2>/dev/null)"
 	[ "$kernel_feed_mismatch" = true ] && json_add_boolean kernel_feed_mismatch 1 || json_add_boolean kernel_feed_mismatch 0
 	[ "$custom_feed_configured" = true ] && json_add_boolean custom_feed_configured 1 || json_add_boolean custom_feed_configured 0
 	[ "$owut_available" = true ] && json_add_boolean owut_available 1 || json_add_boolean owut_available 0
+	firmware_apply_enabled && json_add_boolean firmware_apply_enabled 1 || json_add_boolean firmware_apply_enabled 0
+	sig_url=$(firmware_channel_sig_url)
+	pubkey=$(firmware_channel_pubkey)
+	if [ -n "$sig_url" ] && [ -n "$pubkey" ] && [ -r "$pubkey" ]; then
+		json_add_boolean firmware_signature_configured 1
+	else
+		json_add_boolean firmware_signature_configured 0
+	fi
+	json_add_string current_build_id "$(clean_token "$(firmware_current_build_id)")"
 	json_add_string upgrade_policy "firmware_image_only"
 	json_dump
 }
