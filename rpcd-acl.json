@@ -63,6 +63,7 @@
 				"veci": [
 					"appAction",
 					"firmwareDownload",
+					"firmwareApply",
 					"firmwareCancel",
 					"firmwareUploadFinish",
 					"firmwareUploadChunk",
