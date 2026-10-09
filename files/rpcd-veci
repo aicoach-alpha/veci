@@ -407,8 +407,11 @@ firmware_channel_pubkey() {
 	uci -q get veci.main.firmware_channel_pubkey 2>/dev/null
 }
 
-firmware_max_bytes() {
-	value=$(uci -q get veci.main.firmware_max_bytes 2>/dev/null)
+firmware_apply_enabled() {
+	[ "$(uci -q get veci.main.firmware_apply_enabled 2>/dev/null)" = "1" ]
+}
+
+firmware_max_bytes() {	value=$(uci -q get veci.main.firmware_max_bytes 2>/dev/null)
 	case "$value" in
 		''|*[!0-9]*) printf '0' ;;
 		*) printf '%s' "$value" ;;
@@ -608,6 +611,53 @@ method_firmware_upload_finish() {
 	printf '{ "ok": true, "ready": true, "version": "manual-upload", "sha256": "%s", "bytes": %s }\n' "$actual_sha" "$actual_bytes"
 }
 
+method_firmware_apply() {
+	firmware_apply_enabled || {
+		printf '{ "ok": false, "error": "firmware_apply_disabled" }\n'
+		return
+	}
+
+	image=$(firmware_image_path)
+	state=$(firmware_state_path)
+	[ -r "$image" ] && [ -r "$state" ] || {
+		printf '{ "ok": false, "error": "firmware_not_ready" }\n'
+		return
+	}
+	read -r version expected_sha expected_bytes source signed < "$state" || {
+		printf '{ "ok": false, "error": "firmware_state_invalid" }\n'
+		return
+	}
+	if [ "$source" = "channel" ] && [ "$signed" != "true" ]; then
+		printf '{ "ok": false, "error": "unsigned_channel_metadata" }\n'
+		return
+	fi
+
+	actual_bytes=$(wc -c < "$image" | tr -d '[:space:]')
+	actual_sha=$(sha256sum "$image" 2>/dev/null | awk '{ print $1 }' | tr 'A-F' 'a-f')
+	[ "$actual_bytes" = "$expected_bytes" ] && [ "$actual_sha" = "$expected_sha" ] || {
+		rm -f "$state"
+		printf '{ "ok": false, "error": "firmware_ready_check_failed" }\n'
+		return
+	}
+	if ! sysupgrade -T "$image" >/tmp/veci-sysupgrade-test.log 2>&1; then
+		rm -f "$state"
+		printf '{ "ok": false, "error": "sysupgrade_validation_failed" }\n'
+		return
+	fi
+
+	[ ! -e /tmp/veci-sysupgrade.applying ] || {
+		printf '{ "ok": false, "error": "firmware_apply_in_progress" }\n'
+		return
+	}
+	: > /tmp/veci-sysupgrade.applying
+	rm -f "$state"
+	(
+		sleep 1
+		sysupgrade "$image" >/tmp/veci-sysupgrade-apply.log 2>&1
+	) &
+	printf '{ "ok": true, "rebooting": true }\n'
+}
+
 method_firmware_cancel() {
 	rm -f "$(firmware_image_path)" "$(firmware_state_path)" /tmp/veci-upload-chunk.bin /tmp/veci-sysupgrade-test.log
 	printf '{ "ok": true }\n'
@@ -691,8 +741,10 @@ method_firmware_ready() {
 	actual_bytes=$(wc -c < "$image" | tr -d '[:space:]')
 	actual_sha=$(sha256sum "$image" 2>/dev/null | awk '{ print $1 }' | tr 'A-F' 'a-f')
 	if [ "$actual_bytes" = "$expected_bytes" ] && [ "$actual_sha" = "$expected_sha" ]; then
-		printf '{ "ready": true, "version": "%s", "sha256": "%s", "bytes": %s, "source": "%s", "signed": %s }\n' \
-			"$(clean_token "$version")" "$actual_sha" "$actual_bytes" "$(clean_token "$source")" "$signed"
+		apply_enabled=false
+		firmware_apply_enabled && apply_enabled=true
+		printf '{ "ready": true, "version": "%s", "sha256": "%s", "bytes": %s, "source": "%s", "signed": %s, "apply_enabled": %s }\n' \
+			"$(clean_token "$version")" "$actual_sha" "$actual_bytes" "$(clean_token "$source")" "$signed" "$apply_enabled"
 	else
 		rm -f "$image" "$state"
 		printf '{ "ready": false }\n'
@@ -835,7 +887,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareCheck": {}, "firmwareDownload": {}, "firmwareReady": {}, "firmwareUploadStart": {}, "firmwareUploadChunk": { "offset": "int", "data": "str" }, "firmwareUploadFinish": { "bytes": "int", "sha256": "str" }, "firmwareCancel": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareCheck": {}, "firmwareDownload": {}, "firmwareReady": {}, "firmwareUploadStart": {}, "firmwareUploadChunk": { "offset": "int", "data": "str" }, "firmwareUploadFinish": { "bytes": "int", "sha256": "str" }, "firmwareApply": {}, "firmwareCancel": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -853,6 +905,7 @@ case "$1" in
 			firmwareUploadStart) method_firmware_upload_start ;;
 			firmwareUploadChunk) method_firmware_upload_chunk ;;
 			firmwareUploadFinish) method_firmware_upload_finish ;;
+			firmwareApply) method_firmware_apply ;;
 			firmwareCancel) method_firmware_cancel ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
