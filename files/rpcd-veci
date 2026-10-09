@@ -192,7 +192,7 @@ $(cat "$repo_file" 2>/dev/null)"
 		kernel_feed_mismatch=true
 	fi
 
-	for custom_file in /etc/apk/repositories.d/customfeeds.list /etc/apk/repositories.d/customfeeds.dist; do
+	for custom_file in /etc/apk/repositories.d/customfeeds.list /etc/apk/repositories.d/customfeeds.dist /etc/apk/repositories.d/veci-apps.list; do
 		[ -r "$custom_file" ] || continue
 		if grep -Eq '^[[:space:]]*https?://' "$custom_file"; then
 			custom_feed_configured=true
