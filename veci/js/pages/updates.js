@@ -153,12 +153,42 @@ export default {
 			refresh?.addEventListener('click', async () => {
 				setBusy(refresh, true, 'Checking…');
 				try {
-					status = await loadStatus();
+					[status, ready] = await loadStatus();
 					draw();
 					toast('Update status refreshed.', 'success');
 				} catch (error) {
 					toast(error.message || 'Could not refresh update status.', 'error');
 					setBusy(refresh, false);
+				}
+			});
+
+			const check = root.querySelector('#check-firmware');
+			check?.addEventListener('click', async () => {
+				setBusy(check, true, 'Checking…');
+				try {
+					const result = await api.veci('firmwareCheck', {}, { timeout: 30000 });
+					if (!result.ok) throw new Error(result.error || 'Firmware channel check failed');
+					remote = result;
+					draw();
+					toast('Firmware metadata validated for this board.', 'success');
+				} catch (error) {
+					toast(error.message || 'Could not check firmware channel.', 'error');
+					setBusy(check, false);
+				}
+			});
+
+			const download = root.querySelector('#download-firmware');
+			download?.addEventListener('click', async () => {
+				setBusy(download, true, 'Downloading…');
+				try {
+					const result = await api.veci('firmwareDownload', {}, { timeout: 180000 });
+					if (!result.ok) throw new Error(result.error || 'Firmware validation failed');
+					[, ready] = await loadStatus();
+					draw();
+					toast('Firmware downloaded, checksum verified and sysupgrade test passed.', 'success');
+				} catch (error) {
+					toast(error.message || 'Could not download firmware.', 'error');
+					setBusy(download, false);
 				}
 			});
 		};
