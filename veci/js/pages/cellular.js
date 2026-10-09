@@ -144,7 +144,7 @@ export default {
 			try {
 				const identity = await api.call('veci.cellular', 'identity', {}, { timeout: 10000 });
 				const imei = String(identity.imei || '');
-				if (!identity.available || !/^\\d{15}$/.test(imei)) {
+				if (!identity.available || !/^[0-9]{15}$/.test(imei)) {
 					valueElement.textContent = 'Not available';
 					toast('No valid 15-digit IMEI was returned by the router modem cache.', 'warning');
 					return;
