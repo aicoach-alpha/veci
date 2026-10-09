@@ -395,6 +395,164 @@ EOF
 	fi
 }
 
+firmware_channel_url() {
+	uci -q get veci.main.firmware_channel_url 2>/dev/null
+}
+
+firmware_max_bytes() {
+	value=$(uci -q get veci.main.firmware_max_bytes 2>/dev/null)
+	case "$value" in
+		''|*[!0-9]*) printf '0' ;;
+		*) printf '%s' "$value" ;;
+	esac
+}
+
+firmware_live_board() {
+	ubus call system board 2>/dev/null | jsonfilter -e '@.board_name' 2>/dev/null
+}
+
+valid_https_url() {
+	case "$1" in
+		https://*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+load_firmware_metadata() {
+	channel_url=$(firmware_channel_url)
+	[ -n "$channel_url" ] && valid_https_url "$channel_url" || return 10
+	command -v wget >/dev/null 2>&1 || return 11
+
+	metadata=/tmp/veci-firmware-channel.json
+	wget -qO "$metadata" "$channel_url" || return 12
+
+	schema=$(jsonfilter -i "$metadata" -e '@.schema' 2>/dev/null)
+	firmware_board=$(jsonfilter -i "$metadata" -e '@.board' 2>/dev/null)
+	firmware_version=$(jsonfilter -i "$metadata" -e '@.version' 2>/dev/null)
+	firmware_url=$(jsonfilter -i "$metadata" -e '@.firmware.url' 2>/dev/null)
+	firmware_sha256=$(jsonfilter -i "$metadata" -e '@.firmware.sha256' 2>/dev/null | tr 'A-F' 'a-f')
+	firmware_bytes=$(jsonfilter -i "$metadata" -e '@.firmware.bytes' 2>/dev/null)
+	firmware_notes=$(jsonfilter -i "$metadata" -e '@.release_notes' 2>/dev/null)
+	live_board=$(firmware_live_board)
+
+	[ "$schema" = "1" ] || return 13
+	[ -n "$live_board" ] && [ "$firmware_board" = "$live_board" ] || return 14
+	valid_https_url "$firmware_url" || return 15
+	case "$firmware_sha256" in
+		????????????????????????????????????????????????????????????????) ;;
+		*) return 16 ;;
+	esac
+	printf '%s' "$firmware_sha256" | grep -Eq '^[0-9a-f]{64}$' || return 16
+	case "$firmware_bytes" in
+		''|*[!0-9]*) return 17 ;;
+	esac
+	max_bytes=$(firmware_max_bytes)
+	if [ "$max_bytes" -gt 0 ] 2>/dev/null && [ "$firmware_bytes" -gt "$max_bytes" ] 2>/dev/null; then
+		return 18
+	fi
+	return 0
+}
+
+firmware_metadata_error() {
+	case "$1" in
+		10) printf 'channel_not_configured' ;;
+		11) printf 'downloader_unavailable' ;;
+		12) printf 'channel_fetch_failed' ;;
+		13) printf 'unsupported_channel_schema' ;;
+		14) printf 'board_mismatch' ;;
+		15) printf 'invalid_firmware_url' ;;
+		16) printf 'invalid_firmware_checksum' ;;
+		17) printf 'invalid_firmware_size' ;;
+		18) printf 'firmware_too_large' ;;
+		*) printf 'invalid_firmware_metadata' ;;
+	esac
+}
+
+method_firmware_check() {
+	load_firmware_metadata
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		error=$(firmware_metadata_error "$rc")
+		printf '{ "ok": false, "error": "%s" }\n' "$error"
+		return
+	fi
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean ok 1
+	json_add_string board "$firmware_board"
+	json_add_string version "$firmware_version"
+	json_add_string url "$firmware_url"
+	json_add_string sha256 "$firmware_sha256"
+	json_add_int bytes "$firmware_bytes"
+	json_add_string release_notes "$firmware_notes"
+	json_dump
+}
+
+method_firmware_download() {
+	load_firmware_metadata
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		error=$(firmware_metadata_error "$rc")
+		printf '{ "ok": false, "error": "%s" }\n' "$error"
+		return
+	fi
+
+	image=/tmp/veci-sysupgrade.bin
+	state=/tmp/veci-sysupgrade.ready
+	rm -f "$image" "$state"
+	wget -qO "$image" "$firmware_url" || {
+		rm -f "$image"
+		printf '{ "ok": false, "error": "firmware_download_failed" }\n'
+		return
+	}
+
+	actual_bytes=$(wc -c < "$image" | tr -d '[:space:]')
+	[ "$actual_bytes" = "$firmware_bytes" ] || {
+		rm -f "$image"
+		printf '{ "ok": false, "error": "firmware_size_mismatch" }\n'
+		return
+	}
+	actual_sha256=$(sha256sum "$image" 2>/dev/null | awk '{ print $1 }' | tr 'A-F' 'a-f')
+	[ "$actual_sha256" = "$firmware_sha256" ] || {
+		rm -f "$image"
+		printf '{ "ok": false, "error": "firmware_checksum_mismatch" }\n'
+		return
+	}
+
+	if ! sysupgrade -T "$image" >/tmp/veci-sysupgrade-test.log 2>&1; then
+		rm -f "$image"
+		printf '{ "ok": false, "error": "sysupgrade_validation_failed" }\n'
+		return
+	fi
+
+	printf '%s %s %s\n' "$firmware_version" "$firmware_sha256" "$actual_bytes" > "$state"
+	printf '{ "ok": true, "ready": true, "version": "%s", "sha256": "%s", "bytes": %s }\n' \
+		"$(clean_token "$firmware_version")" "$firmware_sha256" "$actual_bytes"
+}
+
+method_firmware_ready() {
+	image=/tmp/veci-sysupgrade.bin
+	state=/tmp/veci-sysupgrade.ready
+	[ -r "$image" ] && [ -r "$state" ] || {
+		printf '{ "ready": false }\n'
+		return
+	}
+	read -r version expected_sha expected_bytes < "$state" || {
+		printf '{ "ready": false }\n'
+		return
+	}
+	actual_bytes=$(wc -c < "$image" | tr -d '[:space:]')
+	actual_sha=$(sha256sum "$image" 2>/dev/null | awk '{ print $1 }' | tr 'A-F' 'a-f')
+	if [ "$actual_bytes" = "$expected_bytes" ] && [ "$actual_sha" = "$expected_sha" ]; then
+		printf '{ "ready": true, "version": "%s", "sha256": "%s", "bytes": %s }\n' \
+			"$(clean_token "$version")" "$actual_sha" "$actual_bytes"
+	else
+		rm -f "$image" "$state"
+		printf '{ "ready": false }\n'
+	fi
+}
+
 method_diagnostic() {
 	input=$(cat)
 	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
@@ -531,7 +689,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareCheck": {}, "firmwareDownload": {}, "firmwareReady": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -543,6 +701,9 @@ case "$1" in
 			updateStatus) method_update_status ;;
 			apps) method_apps ;;
 			appAction) method_app_action ;;
+			firmwareCheck) method_firmware_check ;;
+			firmwareDownload) method_firmware_download ;;
+			firmwareReady) method_firmware_ready ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
 			diagnostic) method_diagnostic ;;
