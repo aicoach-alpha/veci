@@ -181,7 +181,12 @@ export default {
 						<label class="field">
 							<span><input id="auto-install" type="checkbox" disabled /> Automatically install firmware</span>
 						</label>
-						<p class="panel-copy">Unattended installation stays locked until signed release metadata is enabled. VeCI never performs a blind <code>apk upgrade</code>.</p>
+						<div class="detail-list">
+							<div><span>Check interval</span><strong>${Math.round((Number(firmware.check_interval) || 21600) / 3600)} h</strong></div>
+							<div><span>Last automatic state</span><strong>${escapeHtml(firmware.auto_state || 'not_run')}</strong></div>
+							<div><span>Last result</span><strong>${escapeHtml(firmware.auto_detail || '—')}</strong></div>
+						</div>
+						<p class="panel-copy">Unattended installation stays locked until signed release metadata is enabled. Automatic download may stage and validate an image, but it will not flash it. VeCI never performs a blind <code>apk upgrade</code>.</p>
 						<button id="save-update-policy" class="button button-secondary" type="submit">Save policy</button>
 					</form>
 				</article>
