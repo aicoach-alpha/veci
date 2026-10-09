@@ -42,6 +42,19 @@ export default {
 			const kernelFeedMismatch = Boolean(status.kernel_feed_mismatch);
 			const customFeed = Boolean(status.custom_feed_configured);
 
+			const remoteSummary = remote
+				? `
+					<div class="detail-list">
+						<div><span>Version</span><strong>${escapeHtml(remote.version || '—')}</strong></div>
+						<div><span>Board</span><strong>${escapeHtml(remote.board || '—')}</strong></div>
+						<div><span>Download size</span><strong>${formatBytes(Number(remote.bytes) || 0)}</strong></div>
+						<div><span>SHA256</span><strong class="mono">${escapeHtml(remote.sha256 || '—')}</strong></div>
+					</div>
+					${remote.release_notes ? `<p class="panel-copy">${escapeHtml(remote.release_notes)}</p>` : ''}
+					<button id="download-firmware" class="button button-primary" type="button">Download & verify</button>
+				`
+				: '<p class="panel-copy">No GitHub release has been checked in this session.</p>';
+
 			root.innerHTML = `
 				<div class="page-intro">
 					<div>
