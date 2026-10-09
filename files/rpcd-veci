@@ -235,7 +235,12 @@ package_installed() {
 }
 
 app_feed_enabled() {
-	[ "$(uci -q get veci.main.app_feed_enabled 2>/dev/null)" = "1" ]
+	[ "$(uci -q get veci.main.app_feed_enabled 2>/dev/null)" = "1" ] || return 1
+	configured_build="$(uci -q get veci.main.app_feed_build_id 2>/dev/null || true)"
+	running_build="$(firmware_build_id)"
+	[ -n "$configured_build" ] && [ "$configured_build" = "$running_build" ] || return 1
+	[ -r /etc/apk/repositories.d/veci-apps.list ] || return 1
+	grep -Fq "/feeds/$running_build/" /etc/apk/repositories.d/veci-apps.list
 }
 
 manifest_packages() {
