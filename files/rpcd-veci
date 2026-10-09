@@ -377,7 +377,7 @@ EOF
 	rc=1
 	case "$manager:$action" in
 		apk:install)
-			apk add "$@" >/tmp/veci-app-action.log 2>&1
+			apk -U add "$@" >/tmp/veci-app-action.log 2>&1
 			rc=$?
 			;;
 		apk:remove)
