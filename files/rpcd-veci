@@ -472,6 +472,10 @@ firmware_remote_refresh() {
 
 	schema="$(firmware_manifest_field schema)"
 	[ "$schema" = "1" ] || return 1
+	available="$(firmware_manifest_field available)"
+	case "$available" in
+		false|0) return 0 ;;
+	esac
 	url="$(firmware_manifest_field firmware_url)"
 	sha="$(firmware_manifest_field sha256)"
 	size="$(firmware_manifest_field size)"
@@ -658,14 +662,21 @@ method_firmware_remote_check() {
 
 	compatible=false
 	firmware_manifest_compatible && compatible=true
+	available_value="$(firmware_manifest_field available)"
+	available=true
+	case "$available_value" in false|0) available=false ;; esac
 	remote_build="$(firmware_manifest_field build_id)"
 	local_build="$(firmware_build_id)"
-	update_available=true
-	[ -n "$remote_build" ] && [ "$remote_build" = "$local_build" ] && update_available=false
+	update_available=false
+	if [ "$available" = true ]; then
+		update_available=true
+		[ -n "$remote_build" ] && [ "$remote_build" = "$local_build" ] && update_available=false
+	fi
 
 	. /usr/share/libubox/jshn.sh
 	json_init
 	json_add_boolean ok 1
+	[ "$available" = true ] && json_add_boolean available 1 || json_add_boolean available 0
 	[ "$compatible" = true ] && json_add_boolean compatible 1 || json_add_boolean compatible 0
 	[ "$update_available" = true ] && json_add_boolean update_available 1 || json_add_boolean update_available 0
 	json_add_string channel "$(firmware_manifest_field channel)"
@@ -686,6 +697,9 @@ method_firmware_remote_download() {
 		printf '{ "ok": false, "error": "remote_manifest_invalid" }\n'
 		return
 	fi
+	case "$(firmware_manifest_field available)" in
+		false|0) printf '{ "ok": false, "error": "no_firmware_published" }\n'; return ;;
+	esac
 	firmware_manifest_compatible || {
 		printf '{ "ok": false, "error": "firmware_not_compatible" }\n'
 		return
