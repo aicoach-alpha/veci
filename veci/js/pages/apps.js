@@ -43,6 +43,7 @@ export default {
 		};
 
 		let state = await load();
+		let activeModuleCleanup = null;
 
 		const draw = () => {
 			const feedEnabled = Boolean(state.catalog.feed_enabled);
@@ -70,12 +71,21 @@ export default {
 									: installable
 										? badge('Ready to install', 'info')
 										: badge('Not installed', 'neutral');
-							const action =
-								installed && removable
-									? `<button class="button button-secondary" data-app-action="remove" data-app-id="${escapeHtml(app.id)}" type="button">Remove</button>`
-									: !installed && installable
-										? `<button class="button button-primary" data-app-action="install" data-app-id="${escapeHtml(app.id)}" type="button">Install</button>`
-										: '';
+							const actions = [];
+							if (installed && app.module) {
+								actions.push(
+									`<button class="button button-primary" data-app-module="${escapeHtml(app.module)}" data-app-id="${escapeHtml(app.id)}" type="button">Configure</button>`
+								);
+							}
+							if (installed && removable) {
+								actions.push(
+									`<button class="button button-secondary" data-app-action="remove" data-app-id="${escapeHtml(app.id)}" type="button">Remove</button>`
+								);
+							} else if (!installed && installable) {
+								actions.push(
+									`<button class="button button-primary" data-app-action="install" data-app-id="${escapeHtml(app.id)}" type="button">Install</button>`
+								);
+							}
 							return `
 								<article class="app-card">
 									<div class="app-card-icon">${escapeHtml((app.name || app.id || '?').slice(0, 1))}</div>
@@ -83,7 +93,7 @@ export default {
 										<div class="app-card-title"><h3>${escapeHtml(app.name || app.id || 'App')}</h3>${status}</div>
 										<p>${escapeHtml(app.description || '')}</p>
 										${app.tier ? `<p class="muted">Resource tier ${escapeHtml(app.tier)}</p>` : ''}
-										${action ? `<div class="app-card-actions">${action}</div>` : ''}
+										${actions.length ? `<div class="app-card-actions">${actions.join('')}</div>` : ''}
 									</div>
 								</article>
 							`;
@@ -102,8 +112,46 @@ export default {
 				</div>
 			`;
 
-			root.querySelectorAll('[data-app-action]').forEach(button => {
+			root.querySelectorAll('[data-app-module]').forEach(button => {
 				button.addEventListener('click', async () => {
+					const id = button.dataset.appId;
+					const modulePath = button.dataset.appModule;
+					const app = state.apps.find(item => item.id === id);
+					if (!app || !/^\/veci-apps\/[A-Za-z0-9._/-]+\.js$/.test(modulePath || '')) {
+						toast('This router app module is not valid.', 'error');
+						return;
+					}
+
+					setBusy(button, true, 'Opening…');
+					try {
+						const imported = await import(modulePath);
+						if (!imported.default || typeof imported.default.render !== 'function') {
+							throw new Error('Router app module does not expose a render function');
+						}
+						if (activeModuleCleanup) activeModuleCleanup();
+						activeModuleCleanup = null;
+						root.innerHTML = '';
+						const cleanup = await imported.default.render({
+							api,
+							root,
+							toast,
+							confirm,
+							app,
+							back: () => {
+								if (activeModuleCleanup) activeModuleCleanup();
+								activeModuleCleanup = null;
+								draw();
+							}
+						});
+						activeModuleCleanup = typeof cleanup === 'function' ? cleanup : null;
+					} catch (error) {
+						toast(error.message || 'Could not open router app.', 'error');
+						draw();
+					}
+				});
+			});
+
+			root.querySelectorAll('[data-app-action]').forEach(button => {				button.addEventListener('click', async () => {
 					const id = button.dataset.appId;
 					const action = button.dataset.appAction;
 					const app = state.apps.find(item => item.id === id);
@@ -136,5 +184,8 @@ export default {
 		};
 
 		draw();
+		return () => {
+			if (activeModuleCleanup) activeModuleCleanup();
+		};
 	}
 };
