@@ -687,7 +687,9 @@ method_firmware_remote_check() {
 	json_add_string published_at "$(firmware_manifest_field published_at)"
 	json_add_string firmware_url "$(firmware_manifest_field firmware_url)"
 	json_add_string sha256 "$(firmware_manifest_field sha256)"
-	json_add_int size "$(firmware_manifest_field size)"
+	remote_size="$(firmware_manifest_field size)"
+	case "$remote_size" in ''|*[!0-9]*) remote_size=0 ;; esac
+	json_add_int size "$remote_size"
 	json_add_string notes_url "$(firmware_manifest_field notes_url)"
 	json_dump
 }
