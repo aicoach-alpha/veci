@@ -27,6 +27,8 @@
 					"internetStatus",
 					"updateStatus",
 					"apps",
+					"firmwareCheck",
+					"firmwareReady",
 					"securityStatus",
 					"diagnostic"
 				],
@@ -60,6 +62,7 @@
 				],
 				"veci": [
 					"appAction",
+					"firmwareDownload",
 					"serviceAction",
 					"wifiReload",
 					"setAdminPassword"
