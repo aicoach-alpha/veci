@@ -151,7 +151,8 @@ export default {
 				});
 			});
 
-			root.querySelectorAll('[data-app-action]').forEach(button => {				button.addEventListener('click', async () => {
+			root.querySelectorAll('[data-app-action]').forEach(button => {
+				button.addEventListener('click', async () => {
 					const id = button.dataset.appId;
 					const action = button.dataset.appAction;
 					const app = state.apps.find(item => item.id === id);
