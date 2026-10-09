@@ -32,6 +32,9 @@
 				],
 				"veci.cellular": [
 					"status"
+				],
+				"veci.app.*": [
+					"status"
 				]
 			},
 			"uci": [
@@ -67,6 +70,13 @@
 				"veci.cellular": [
 					"reconnect",
 					"switchSim"
+				],
+				"veci.app.*": [
+					"save",
+					"action",
+					"create",
+					"revoke",
+					"cleanup"
 				]
 			},
 			"uci": [
