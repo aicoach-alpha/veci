@@ -1,0 +1,13 @@
+#!/bin/sh
+
+result="$(ubus call veci firmwareAutoTick 2>/dev/null)" || exit 0
+action="$(printf '%s' "$result" | jsonfilter -e '@.action' 2>/dev/null)"
+error="$(printf '%s' "$result" | jsonfilter -e '@.error' 2>/dev/null)"
+
+case "$action" in
+	disabled|not_due|up_to_date|'') ;;
+	*) logger -t veci-update "automatic firmware action: $action" ;;
+esac
+
+[ -n "$error" ] && logger -t veci-update "automatic firmware check failed: $error"
+exit 0
