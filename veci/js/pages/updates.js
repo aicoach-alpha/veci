@@ -149,7 +149,7 @@ export default {
 					<div class="detail-list">
 						<div><span>Manifest</span><strong>${escapeHtml(firmware.manifest_url || 'Firmware profile has not configured a channel')}</strong></div>
 						${remote ? `
-							<div><span>Version</span><strong>${escapeHtml(remote.version || '—')}</strong></div>
+							<div><span>Published release</span><strong>${remote.available === false ? 'None yet' : escapeHtml(remote.version || '—')}</strong></div>
 							<div><span>Channel</span><strong>${escapeHtml(remote.channel || '—')}</strong></div>
 							<div><span>Compatibility</span><strong>${remote.compatible ? 'Compatible' : 'Not compatible with this board'}</strong></div>
 							<div><span>Size</span><strong>${formatBytes(remote.size)}</strong></div>
@@ -306,12 +306,14 @@ export default {
 					remote = result;
 					draw();
 					toast(
-						result.compatible
-							? result.update_available
-								? 'Compatible firmware is available.'
-								: 'Router already matches the remote build.'
-							: 'Remote firmware does not match this board.',
-						result.compatible ? 'success' : 'warning'
+						result.available === false
+							? 'No firmware has been published on this channel yet.'
+							: result.compatible
+								? result.update_available
+									? 'Compatible firmware is available.'
+									: 'Router already matches the remote build.'
+								: 'Remote firmware does not match this board.',
+						result.available === false ? 'info' : result.compatible ? 'success' : 'warning'
 					);
 				} catch (error) {
 					toast(error.message || 'Remote update check failed.', 'error');
