@@ -35,7 +35,7 @@ export default {
 	eyebrow: 'MAINTENANCE',
 	icon: 'refresh',
 
-	async render({ api, root, toast }) {
+	async render({ api, root, toast, confirm }) {
 		const loadStatus = async () =>
 			Promise.all([
 				api.veci('updateStatus', {}, { timeout: 10000 }).catch(() => ({})),
@@ -133,7 +133,16 @@ export default {
 										<div><span>Size</span><strong>${formatBytes(Number(ready.bytes) || 0)}</strong></div>
 										<div><span>SHA256</span><strong class="mono">${escapeHtml(ready.sha256 || '—')}</strong></div>
 									</div>
-									<p class="panel-copy">Checksum and <code>sysupgrade -T</code> validation passed. Apply/flash stays disabled in this stage.</p>
+									<div class="detail-list">
+										<div><span>Source</span><strong>${escapeHtml(ready.source || '—')}</strong></div>
+										<div><span>Signed metadata</span><strong>${ready.signed ? 'Verified' : 'No'}</strong></div>
+									</div>
+									<p class="panel-copy">Checksum and <code>sysupgrade -T</code> validation passed.</p>
+									${
+										ready.apply_enabled && (ready.source !== 'channel' || ready.signed)
+											? '<button id="apply-firmware" class="button button-danger" type="button">Install & reboot</button>'
+											: '<p class="panel-copy">Install is locked by the firmware safety profile.</p>'
+									}
 								`
 								: '<p class="panel-copy">Firmware must pass board, size, SHA256 and <code>sysupgrade -T</code> checks before install can be offered.</p>'
 						}
@@ -242,8 +251,37 @@ export default {
 				}
 			});
 
-			const download = root.querySelector('#download-firmware');
-			download?.addEventListener('click', async () => {
+			const apply = root.querySelector('#apply-firmware');
+			apply?.addEventListener('click', async () => {
+				const allowed = await confirm({
+					title: 'Install this firmware now?',
+					message:
+						'The router will reboot and all network connections will drop. VeCI will revalidate the staged image immediately before sysupgrade.',
+					confirmLabel: 'Install & reboot',
+					tone: 'danger'
+				});
+				if (!allowed) return;
+
+				setBusy(apply, true, 'Starting upgrade…');
+				try {
+					const result = await api.veci('firmwareApply', {}, { timeout: 15000 });
+					if (!result.ok) throw new Error(result.error || 'Firmware install was rejected');
+					root.innerHTML = `
+						<div class="panel">
+							<div class="panel-heading">
+								<div><p class="eyebrow">FIRMWARE</p><h3>Upgrade started</h3></div>
+								${badge('Rebooting', 'warning')}
+							</div>
+							<p class="panel-copy">Do not disconnect power. The router is applying the validated firmware image and will reboot.</p>
+						</div>
+					`;
+				} catch (error) {
+					toast(error.message || 'Could not start firmware install.', 'error');
+					setBusy(apply, false);
+				}
+			});
+
+			const download = root.querySelector('#download-firmware');			download?.addEventListener('click', async () => {
 				setBusy(download, true, 'Downloading…');
 				try {
 					const result = await api.veci('firmwareDownload', {}, { timeout: 180000 });
