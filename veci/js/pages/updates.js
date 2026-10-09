@@ -18,6 +18,17 @@ function boolText(value) {
 	return value ? 'Available' : 'Not installed';
 }
 
+async function sha256File(file) {
+	const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+	return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+
+function bytesToBase64(bytes) {
+	let binary = '';
+	for (const value of bytes) binary += String.fromCharCode(value);
+	return btoa(binary);
+}
+
 export default {
 	id: 'updates',
 	title: 'Updates',
@@ -75,7 +86,12 @@ export default {
 							<div><span>Revision</span><strong>${escapeHtml(status.revision || '—')}</strong></div>
 							<div><span>Upgrade method</span><strong>sysupgrade image</strong></div>
 						</div>
-						<a class="button button-secondary" href="/cgi-bin/luci/admin/system/flash">Manual upload via Expert (temporary fallback)</a>
+						<label class="field">
+							<span>Manual sysupgrade image</span>
+							<input id="manual-firmware-file" type="file" accept=".bin,application/octet-stream" />
+						</label>
+						<button id="upload-manual-firmware" class="button button-primary" type="button">Upload & verify</button>
+						<a class="button button-secondary" href="/cgi-bin/luci/admin/system/flash">Expert flash page</a>
 					</article>
 
 					<article class="panel">
