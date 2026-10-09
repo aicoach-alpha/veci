@@ -468,6 +468,126 @@ firmware_metadata_error() {
 	esac
 }
 
+firmware_image_path() {
+	printf '/tmp/veci-sysupgrade.bin'
+}
+
+firmware_state_path() {
+	printf '/tmp/veci-sysupgrade.ready'
+}
+
+method_firmware_upload_start() {
+	image=$(firmware_image_path)
+	state=$(firmware_state_path)
+	rm -f "$image" "$state" /tmp/veci-upload-chunk.bin
+	: > "$image" || {
+		printf '{ "ok": false, "error": "upload_init_failed" }\n'
+		return
+	}
+	max_bytes=$(firmware_max_bytes)
+	[ "$max_bytes" -gt 0 ] 2>/dev/null || max_bytes=16777216
+	printf '{ "ok": true, "chunk_bytes": 32768, "max_bytes": %s }\n' "$max_bytes"
+}
+
+method_firmware_upload_chunk() {
+	input=$(cat)
+	offset=$(printf '%s' "$input" | jsonfilter -e '@.offset' 2>/dev/null)
+	data=$(printf '%s' "$input" | jsonfilter -e '@.data' 2>/dev/null)
+	case "$offset" in
+		''|*[!0-9]*) printf '{ "ok": false, "error": "invalid_upload_offset" }\n'; return ;;
+	esac
+	[ -n "$data" ] || {
+		printf '{ "ok": false, "error": "empty_upload_chunk" }\n'
+		return
+	}
+
+	image=$(firmware_image_path)
+	[ -f "$image" ] || {
+		printf '{ "ok": false, "error": "upload_not_started" }\n'
+		return
+	}
+	current=$(wc -c < "$image" | tr -d '[:space:]')
+	[ "$current" = "$offset" ] || {
+		printf '{ "ok": false, "error": "upload_offset_mismatch", "expected": %s }\n' "$current"
+		return
+	}
+
+	chunk=/tmp/veci-upload-chunk.bin
+	if ! printf '%s' "$data" | base64 -d > "$chunk" 2>/dev/null; then
+		rm -f "$chunk"
+		printf '{ "ok": false, "error": "invalid_upload_chunk" }\n'
+		return
+	fi
+	chunk_bytes=$(wc -c < "$chunk" | tr -d '[:space:]')
+	[ "$chunk_bytes" -gt 0 ] 2>/dev/null && [ "$chunk_bytes" -le 32768 ] 2>/dev/null || {
+		rm -f "$chunk"
+		printf '{ "ok": false, "error": "upload_chunk_too_large" }\n'
+		return
+	}
+
+	max_bytes=$(firmware_max_bytes)
+	[ "$max_bytes" -gt 0 ] 2>/dev/null || max_bytes=16777216
+	next=$((current + chunk_bytes))
+	[ "$next" -le "$max_bytes" ] || {
+		rm -f "$chunk" "$image"
+		printf '{ "ok": false, "error": "firmware_too_large" }\n'
+		return
+	}
+
+	cat "$chunk" >> "$image" || {
+		rm -f "$chunk" "$image"
+		printf '{ "ok": false, "error": "upload_write_failed" }\n'
+		return
+	}
+	rm -f "$chunk"
+	printf '{ "ok": true, "next_offset": %s }\n' "$next"
+}
+
+method_firmware_upload_finish() {
+	input=$(cat)
+	expected_bytes=$(printf '%s' "$input" | jsonfilter -e '@.bytes' 2>/dev/null)
+	expected_sha=$(printf '%s' "$input" | jsonfilter -e '@.sha256' 2>/dev/null | tr 'A-F' 'a-f')
+	case "$expected_bytes" in
+		''|*[!0-9]*) printf '{ "ok": false, "error": "invalid_firmware_size" }\n'; return ;;
+	esac
+	printf '%s' "$expected_sha" | grep -Eq '^[0-9a-f]{64}$' || {
+		printf '{ "ok": false, "error": "invalid_firmware_checksum" }\n'
+		return
+	}
+
+	image=$(firmware_image_path)
+	state=$(firmware_state_path)
+	[ -f "$image" ] || {
+		printf '{ "ok": false, "error": "upload_not_started" }\n'
+		return
+	}
+	actual_bytes=$(wc -c < "$image" | tr -d '[:space:]')
+	[ "$actual_bytes" = "$expected_bytes" ] || {
+		rm -f "$image"
+		printf '{ "ok": false, "error": "firmware_size_mismatch" }\n'
+		return
+	}
+	actual_sha=$(sha256sum "$image" 2>/dev/null | awk '{ print $1 }' | tr 'A-F' 'a-f')
+	[ "$actual_sha" = "$expected_sha" ] || {
+		rm -f "$image"
+		printf '{ "ok": false, "error": "firmware_checksum_mismatch" }\n'
+		return
+	}
+	if ! sysupgrade -T "$image" >/tmp/veci-sysupgrade-test.log 2>&1; then
+		rm -f "$image" "$state"
+		printf '{ "ok": false, "error": "sysupgrade_validation_failed" }\n'
+		return
+	fi
+
+	printf '%s %s %s\n' 'manual-upload' "$actual_sha" "$actual_bytes" > "$state"
+	printf '{ "ok": true, "ready": true, "version": "manual-upload", "sha256": "%s", "bytes": %s }\n' "$actual_sha" "$actual_bytes"
+}
+
+method_firmware_cancel() {
+	rm -f "$(firmware_image_path)" "$(firmware_state_path)" /tmp/veci-upload-chunk.bin /tmp/veci-sysupgrade-test.log
+	printf '{ "ok": true }\n'
+}
+
 method_firmware_check() {
 	load_firmware_metadata
 	rc=$?
@@ -689,7 +809,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareCheck": {}, "firmwareDownload": {}, "firmwareReady": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareCheck": {}, "firmwareDownload": {}, "firmwareReady": {}, "firmwareUploadStart": {}, "firmwareUploadChunk": { "offset": "int", "data": "str" }, "firmwareUploadFinish": { "bytes": "int", "sha256": "str" }, "firmwareCancel": {}, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -704,6 +824,10 @@ case "$1" in
 			firmwareCheck) method_firmware_check ;;
 			firmwareDownload) method_firmware_download ;;
 			firmwareReady) method_firmware_ready ;;
+			firmwareUploadStart) method_firmware_upload_start ;;
+			firmwareUploadChunk) method_firmware_upload_chunk ;;
+			firmwareUploadFinish) method_firmware_upload_finish ;;
+			firmwareCancel) method_firmware_cancel ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
 			diagnostic) method_diagnostic ;;
