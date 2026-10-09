@@ -79,7 +79,8 @@ export default {
 			const kernelFeedMismatch = Boolean(status.kernel_feed_mismatch);
 			const customFeed = Boolean(status.custom_feed_configured);
 			const staged = Boolean(firmware.staged);
-			const validated = Boolean(firmware.validated) && Boolean(validationToken || firmware.apply_ready);
+			const serverValidated = Boolean(firmware.validated);
+			const installUnlocked = serverValidated && Boolean(validationToken);
 			const maxBytes = Number(firmware.max_bytes) || 0;
 
 			root.innerHTML = `
@@ -108,14 +109,14 @@ export default {
 					<article class="panel">
 						<div class="panel-heading">
 							<div><p class="eyebrow">STAGED IMAGE</p><h3>Validation</h3></div>
-							${validated ? badge('Validated', 'success') : staged ? badge('Needs validation', 'warning') : badge('Empty', 'neutral')}
+							${serverValidated ? badge('Validated', 'success') : staged ? badge('Needs validation', 'warning') : badge('Empty', 'neutral')}
 						</div>
 						<div class="detail-list">
 							<div><span>Staged</span><strong>${staged ? formatBytes(firmware.bytes) : '—'}</strong></div>
 							<div><span>SHA256</span><strong>${escapeHtml(firmware.sha256 ? firmware.sha256.slice(0, 16) + '…' : '—')}</strong></div>
 							<div><span>Image budget</span><strong>${maxBytes ? formatBytes(maxBytes) : '—'}</strong></div>
 						</div>
-						${staged && !validated ? '<button id="validate-staged" class="button button-secondary" type="button">Validate staged image</button>' : ''}
+						${staged && !installUnlocked ? `<button id="validate-staged" class="button button-secondary" type="button">${serverValidated ? 'Revalidate for install' : 'Validate staged image'}</button>` : ''}
 					</article>
 				</div>
 
@@ -210,13 +211,13 @@ export default {
 					<article class="panel danger-panel">
 						<div class="panel-heading">
 							<div><p class="eyebrow">INSTALL</p><h3>Apply validated firmware</h3></div>
-							${validated ? badge('Ready', 'warning') : badge('Locked', 'neutral')}
+							${installUnlocked ? badge('Ready', 'warning') : serverValidated ? badge('Revalidate required', 'warning') : badge('Locked', 'neutral')}
 						</div>
 						<p class="panel-copy">Installing firmware interrupts the network and reboots the router. This action is available only after the exact staged file passes validation.</p>
 						<label class="field">
 							<span><input id="keep-settings" type="checkbox" checked /> Keep current OpenWrt settings</span>
 						</label>
-						<button id="apply-firmware" class="button button-danger" type="button" ${validated && validationToken ? '' : 'disabled'}>Install & reboot</button>
+						<button id="apply-firmware" class="button button-danger" type="button" ${installUnlocked ? '' : 'disabled'}>Install & reboot</button>
 					</article>
 				</div>
 
