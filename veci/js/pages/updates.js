@@ -82,6 +82,7 @@ export default {
 			const serverValidated = Boolean(firmware.validated);
 			const installUnlocked = serverValidated && Boolean(validationToken);
 			const maxBytes = Number(firmware.max_bytes) || 0;
+			const automaticInstallSupported = Boolean(firmware.automatic_install_supported);
 
 			root.innerHTML = `
 				<div class="page-intro">
@@ -114,6 +115,8 @@ export default {
 						<div class="detail-list">
 							<div><span>Staged</span><strong>${staged ? formatBytes(firmware.bytes) : '—'}</strong></div>
 							<div><span>SHA256</span><strong>${escapeHtml(firmware.sha256 ? firmware.sha256.slice(0, 16) + '…' : '—')}</strong></div>
+							<div><span>Signature policy</span><strong>${escapeHtml(firmware.signature_policy || 'development')}</strong></div>
+							<div><span>Trusted signature</span><strong>${firmware.signature_verified ? 'Verified' : firmware.signature_policy === 'required' ? 'Not verified' : 'Development image'}</strong></div>
 							<div><span>Image budget</span><strong>${maxBytes ? formatBytes(maxBytes) : '—'}</strong></div>
 						</div>
 						${staged && !installUnlocked ? `<button id="validate-staged" class="button button-secondary" type="button">${serverValidated ? 'Revalidate for install' : 'Validate staged image'}</button>` : ''}
@@ -180,14 +183,14 @@ export default {
 							<span><input id="auto-download" type="checkbox" ${firmware.auto_download ? 'checked' : ''} /> Automatically download compatible firmware</span>
 						</label>
 						<label class="field">
-							<span><input id="auto-install" type="checkbox" disabled /> Automatically install firmware</span>
+							<span><input id="auto-install" type="checkbox" ${firmware.auto_install ? 'checked' : ''} ${automaticInstallSupported ? '' : 'disabled'} /> Automatically install trusted firmware after validation</span>
 						</label>
 						<div class="detail-list">
 							<div><span>Check interval</span><strong>${Math.round((Number(firmware.check_interval) || 21600) / 3600)} h</strong></div>
 							<div><span>Last automatic state</span><strong>${escapeHtml(firmware.auto_state || 'not_run')}</strong></div>
 							<div><span>Last result</span><strong>${escapeHtml(firmware.auto_detail || '—')}</strong></div>
 						</div>
-						<p class="panel-copy">Unattended installation stays locked until signed release metadata is enabled. Automatic download may stage and validate an image, but it will not flash it. VeCI never performs a blind <code>apk upgrade</code>.</p>
+						<p class="panel-copy">${automaticInstallSupported ? 'Automatic install is opt-in and only runs after the image passes board, checksum, sysupgrade and trusted-signature verification. It reboots the router when a verified update is found.' : 'Automatic install is locked on development firmware until a trusted VeCI firmware signing key is embedded. Automatic download may still stage and validate an image.'} VeCI never performs a blind <code>apk upgrade</code>.</p>
 						<button id="save-update-policy" class="button button-secondary" type="submit">Save policy</button>
 					</form>
 				</article>
@@ -358,10 +361,24 @@ export default {
 				const button = root.querySelector('#save-update-policy');
 				setBusy(button, true, 'Saving…');
 				try {
+					const wantsAutoInstall = root.querySelector('#auto-install').checked;
+					if (wantsAutoInstall && !firmware.auto_install) {
+						const allowed = await confirm({
+							title: 'Enable automatic firmware install?',
+							message:
+								'When a compatible firmware update is found, VeCI will download it, verify the trusted image signature and sysupgrade compatibility, then install it automatically and reboot the router.',
+							confirmLabel: 'Enable automatic install',
+							tone: 'danger'
+						});
+						if (!allowed) {
+							setBusy(button, false);
+							return;
+						}
+					}
 					const result = await api.veci('firmwarePolicySave', {
 						auto_check: root.querySelector('#auto-check').checked,
 						auto_download: root.querySelector('#auto-download').checked,
-						auto_install: false
+						auto_install: wantsAutoInstall
 					});
 					if (!result.ok) throw new Error(result.error || 'Could not save update policy');
 					state = await loadStatus();
