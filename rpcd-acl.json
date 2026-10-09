@@ -28,7 +28,9 @@
 					"updateStatus",
 					"apps",
 					"securityStatus",
-					"diagnostic"
+					"diagnostic",
+					"firmwareStatus",
+					"firmwareRemoteCheck"
 				],
 				"veci.cellular": [
 					"status"
@@ -65,7 +67,14 @@
 					"appAction",
 					"serviceAction",
 					"wifiReload",
-					"setAdminPassword"
+					"setAdminPassword",
+					"firmwareUploadStart",
+					"firmwareUploadChunk",
+					"firmwareUploadFinish",
+					"firmwareValidate",
+					"firmwareRemoteDownload",
+					"firmwarePolicySave",
+					"firmwareApply"
 				],
 				"veci.cellular": [
 					"reconnect",
