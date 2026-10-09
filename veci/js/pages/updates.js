@@ -281,7 +281,8 @@ export default {
 				}
 			});
 
-			const download = root.querySelector('#download-firmware');			download?.addEventListener('click', async () => {
+			const download = root.querySelector('#download-firmware');
+			download?.addEventListener('click', async () => {
 				setBusy(download, true, 'Downloading…');
 				try {
 					const result = await api.veci('firmwareDownload', {}, { timeout: 180000 });
