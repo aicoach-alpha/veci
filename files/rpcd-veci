@@ -266,11 +266,17 @@ method_apps() {
 		name=$(jsonfilter -i "$manifest" -e '@.name' 2>/dev/null)
 		description=$(jsonfilter -i "$manifest" -e '@.description' 2>/dev/null)
 		tier=$(jsonfilter -i "$manifest" -e '@.tier' 2>/dev/null)
+		module=$(jsonfilter -i "$manifest" -e '@.module' 2>/dev/null)
 		enabled_value=$(jsonfilter -i "$manifest" -e '@.enabled' 2>/dev/null)
 		id=$(clean_token "$id")
 		name=$(clean_text "$name")
 		description=$(clean_text "$description")
 		tier=$(clean_token "$tier")
+		safe_module=$(printf '%s' "$module" | tr -cd 'A-Za-z0-9._/-')
+		case "$module" in
+			/veci-apps/*.js) [ "$safe_module" = "$module" ] || module='' ;;
+			*) module='' ;;
+		esac
 		case "$enabled_value" in
 			false|0) enabled=false ;;
 			*) enabled=true ;;
@@ -297,7 +303,7 @@ EOF
 			installable=true
 		fi
 
-		item="{ \"id\": \"$id\", \"name\": \"$name\", \"description\": \"$description\", \"tier\": \"$tier\", \"packages\": [ $packages ], \"enabled\": $enabled, \"installed\": $installed, \"installable\": $installable, \"removable\": $removable }"
+		item="{ \"id\": \"$id\", \"name\": \"$name\", \"description\": \"$description\", \"tier\": \"$tier\", \"module\": \"$module\", \"packages\": [ $packages ], \"enabled\": $enabled, \"installed\": $installed, \"installable\": $installable, \"removable\": $removable }"
 		items="${items:+$items, }$item"
 	done
 
