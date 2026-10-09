@@ -401,6 +401,379 @@ EOF
 	fi
 }
 
+
+firmware_path='/tmp/veci-firmware.bin'
+firmware_upload_meta='/tmp/veci-firmware-upload.meta'
+firmware_validation_meta='/tmp/veci-firmware-validation.meta'
+firmware_remote_manifest='/tmp/veci-update-manifest.json'
+firmware_max_bytes=$((7808 * 1024))
+
+firmware_board_name() {
+	if [ -r /tmp/sysinfo/board_name ]; then
+		head -n 1 /tmp/sysinfo/board_name | tr -cd 'A-Za-z0-9,._+-'
+		return
+	fi
+	ubus call system board 2>/dev/null | jsonfilter -e '@.board_name' 2>/dev/null | tr -cd 'A-Za-z0-9,._+-'
+}
+
+firmware_build_id() {
+	if [ -r /etc/veci-release.json ]; then
+		jsonfilter -i /etc/veci-release.json -e '@.build_id' 2>/dev/null | tr -cd 'A-Fa-f0-9'
+	fi
+}
+
+firmware_token() {
+	if [ -r /dev/urandom ] && command -v sha256sum >/dev/null 2>&1; then
+		head -c 32 /dev/urandom 2>/dev/null | sha256sum | awk '{ print $1 }'
+	else
+		printf '%s-%s-%s' "$" "$(date +%s)" "$(firmware_board_name)" | sha256sum | awk '{ print $1 }'
+	fi
+}
+
+firmware_safe_https_url() {
+	case "$1" in
+		https://*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+firmware_fetch() {
+	url="$1"
+	output="$2"
+	firmware_safe_https_url "$url" || return 1
+	rm -f "$output"
+	if command -v uclient-fetch >/dev/null 2>&1; then
+		uclient-fetch -q -O "$output" "$url"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$output" "$url"
+	else
+		return 1
+	fi
+}
+
+firmware_manifest_field() {
+	jsonfilter -i "$firmware_remote_manifest" -e "@.$1" 2>/dev/null
+}
+
+firmware_manifest_compatible() {
+	board="$(firmware_board_name)"
+	[ -n "$board" ] || return 1
+	for supported in $(jsonfilter -i "$firmware_remote_manifest" -e '@.supported_devices[*]' 2>/dev/null); do
+		[ "$supported" = "$board" ] && return 0
+	done
+	manifest_board="$(firmware_manifest_field board)"
+	[ "$manifest_board" = "$board" ]
+}
+
+firmware_remote_refresh() {
+	manifest_url="$(uci -q get veci.update.manifest_url 2>/dev/null || true)"
+	[ -n "$manifest_url" ] && firmware_safe_https_url "$manifest_url" || return 1
+	firmware_fetch "$manifest_url" "$firmware_remote_manifest" || return 1
+
+	schema="$(firmware_manifest_field schema)"
+	[ "$schema" = "1" ] || return 1
+	url="$(firmware_manifest_field firmware_url)"
+	sha="$(firmware_manifest_field sha256)"
+	size="$(firmware_manifest_field size)"
+	firmware_safe_https_url "$url" || return 1
+	case "$sha" in
+		????????????????????????????????????????????????????????????????) ;;
+		*) return 1 ;;
+	esac
+	case "$size" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$size" -gt 0 ] 2>/dev/null && [ "$size" -le "$firmware_max_bytes" ] 2>/dev/null || return 1
+	return 0
+}
+
+method_firmware_status() {
+	staged=false
+	validated=false
+	bytes=0
+	sha=''
+	token_ready=false
+	if [ -f "$firmware_path" ]; then
+		staged=true
+		bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+		command -v sha256sum >/dev/null 2>&1 && sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	fi
+	if [ -r "$firmware_validation_meta" ]; then
+		read -r validation_sha validation_board validation_token < "$firmware_validation_meta" || true
+		if [ -n "$sha" ] && [ "$validation_sha" = "$sha" ] && [ "$validation_board" = "$(firmware_board_name)" ]; then
+			validated=true
+			[ -n "$validation_token" ] && token_ready=true
+		fi
+	fi
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_string board "$(firmware_board_name)"
+	json_add_string build_id "$(firmware_build_id)"
+	[ "$staged" = true ] && json_add_boolean staged 1 || json_add_boolean staged 0
+	[ "$validated" = true ] && json_add_boolean validated 1 || json_add_boolean validated 0
+	[ "$token_ready" = true ] && json_add_boolean apply_ready 1 || json_add_boolean apply_ready 0
+	json_add_int bytes "$bytes"
+	json_add_string sha256 "$sha"
+	json_add_int max_bytes "$firmware_max_bytes"
+	json_add_string manifest_url "$(uci -q get veci.update.manifest_url 2>/dev/null || true)"
+	[ "$(uci -q get veci.update.auto_check 2>/dev/null)" = "1" ] && json_add_boolean auto_check 1 || json_add_boolean auto_check 0
+	[ "$(uci -q get veci.update.auto_download 2>/dev/null)" = "1" ] && json_add_boolean auto_download 1 || json_add_boolean auto_download 0
+	[ "$(uci -q get veci.update.auto_install 2>/dev/null)" = "1" ] && json_add_boolean auto_install 1 || json_add_boolean auto_install 0
+	json_dump
+}
+
+method_firmware_upload_start() {
+	input="$(cat)"
+	filename="$(printf '%s' "$input" | jsonfilter -e '@.filename' 2>/dev/null)"
+	size="$(printf '%s' "$input" | jsonfilter -e '@.size' 2>/dev/null)"
+	case "$filename" in
+		*.bin) ;;
+		*) printf '{ "ok": false, "error": "firmware_filename_required" }\n'; return ;;
+	esac
+	case "$size" in
+		''|*[!0-9]*) printf '{ "ok": false, "error": "invalid_firmware_size" }\n'; return ;;
+	esac
+	[ "$size" -gt 0 ] 2>/dev/null && [ "$size" -le "$firmware_max_bytes" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "firmware_too_large" }\n'
+		return
+	}
+
+	upload_id="$(firmware_token)"
+	rm -f "$firmware_path" "$firmware_validation_meta"
+	: > "$firmware_path"
+	printf '%s %s 0\n' "$upload_id" "$size" > "$firmware_upload_meta"
+	printf '{ "ok": true, "upload_id": "%s", "max_bytes": %s }\n' "$upload_id" "$firmware_max_bytes"
+}
+
+method_firmware_upload_chunk() {
+	input="$(cat)"
+	upload_id="$(printf '%s' "$input" | jsonfilter -e '@.upload_id' 2>/dev/null)"
+	sequence="$(printf '%s' "$input" | jsonfilter -e '@.sequence' 2>/dev/null)"
+	data="$(printf '%s' "$input" | jsonfilter -e '@.data' 2>/dev/null)"
+
+	[ -r "$firmware_upload_meta" ] || {
+		printf '{ "ok": false, "error": "upload_not_started" }\n'
+		return
+	}
+	read -r expected_id expected_size expected_sequence < "$firmware_upload_meta" || true
+	[ "$upload_id" = "$expected_id" ] || {
+		printf '{ "ok": false, "error": "upload_id_mismatch" }\n'
+		return
+	}
+	case "$sequence" in
+		''|*[!0-9]*) printf '{ "ok": false, "error": "invalid_sequence" }\n'; return ;;
+	esac
+	[ "$sequence" -eq "$expected_sequence" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "unexpected_sequence", "expected": %s }\n' "$expected_sequence"
+		return
+	}
+	[ -n "$data" ] || {
+		printf '{ "ok": false, "error": "empty_chunk" }\n'
+		return
+	}
+	command -v base64 >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "base64_unavailable" }\n'
+		return
+	}
+
+	tmp_chunk="/tmp/veci-firmware-chunk.$"
+	if ! printf '%s' "$data" | base64 -d > "$tmp_chunk" 2>/dev/null; then
+		rm -f "$tmp_chunk"
+		printf '{ "ok": false, "error": "invalid_chunk_encoding" }\n'
+		return
+	fi
+	cat "$tmp_chunk" >> "$firmware_path"
+	rm -f "$tmp_chunk"
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -le "$expected_size" ] 2>/dev/null || {
+		rm -f "$firmware_path" "$firmware_upload_meta"
+		printf '{ "ok": false, "error": "upload_exceeds_declared_size" }\n'
+		return
+	}
+	next=$((expected_sequence + 1))
+	printf '%s %s %s\n' "$expected_id" "$expected_size" "$next" > "$firmware_upload_meta"
+	printf '{ "ok": true, "sequence": %s, "bytes": %s }\n' "$sequence" "$bytes"
+}
+
+method_firmware_upload_finish() {
+	input="$(cat)"
+	upload_id="$(printf '%s' "$input" | jsonfilter -e '@.upload_id' 2>/dev/null)"
+	[ -r "$firmware_upload_meta" ] || {
+		printf '{ "ok": false, "error": "upload_not_started" }\n'
+		return
+	}
+	read -r expected_id expected_size expected_sequence < "$firmware_upload_meta" || true
+	[ "$upload_id" = "$expected_id" ] || {
+		printf '{ "ok": false, "error": "upload_id_mismatch" }\n'
+		return
+	}
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -eq "$expected_size" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "upload_size_mismatch", "bytes": %s, "expected": %s }\n' "$bytes" "$expected_size"
+		return
+	}
+	rm -f "$firmware_upload_meta"
+	sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	printf '{ "ok": true, "bytes": %s, "sha256": "%s" }\n' "$bytes" "$sha"
+}
+
+method_firmware_validate() {
+	input="$(cat)"
+	expected_sha="$(printf '%s' "$input" | jsonfilter -e '@.expected_sha256' 2>/dev/null)"
+	[ -f "$firmware_path" ] || {
+		printf '{ "ok": false, "error": "firmware_not_staged" }\n'
+		return
+	}
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -gt 0 ] 2>/dev/null && [ "$bytes" -le "$firmware_max_bytes" ] 2>/dev/null || {
+		printf '{ "ok": false, "error": "invalid_firmware_size" }\n'
+		return
+	}
+	sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	if [ -n "$expected_sha" ] && [ "$expected_sha" != "$sha" ]; then
+		printf '{ "ok": false, "error": "checksum_mismatch", "sha256": "%s" }\n' "$sha"
+		return
+	fi
+	command -v sysupgrade >/dev/null 2>&1 || {
+		printf '{ "ok": false, "error": "sysupgrade_unavailable" }\n'
+		return
+	}
+	if ! sysupgrade -T "$firmware_path" >/tmp/veci-sysupgrade-test.log 2>&1; then
+		printf '{ "ok": false, "error": "sysupgrade_test_failed" }\n'
+		return
+	fi
+	board="$(firmware_board_name)"
+	token="$(firmware_token)"
+	printf '%s %s %s\n' "$sha" "$board" "$token" > "$firmware_validation_meta"
+	printf '{ "ok": true, "validated": true, "board": "%s", "bytes": %s, "sha256": "%s", "apply_token": "%s" }\n' \
+		"$board" "$bytes" "$sha" "$token"
+}
+
+method_firmware_remote_check() {
+	if ! firmware_remote_refresh; then
+		printf '{ "ok": false, "error": "remote_manifest_invalid" }\n'
+		return
+	fi
+
+	compatible=false
+	firmware_manifest_compatible && compatible=true
+	remote_build="$(firmware_manifest_field build_id)"
+	local_build="$(firmware_build_id)"
+	update_available=true
+	[ -n "$remote_build" ] && [ "$remote_build" = "$local_build" ] && update_available=false
+
+	. /usr/share/libubox/jshn.sh
+	json_init
+	json_add_boolean ok 1
+	[ "$compatible" = true ] && json_add_boolean compatible 1 || json_add_boolean compatible 0
+	[ "$update_available" = true ] && json_add_boolean update_available 1 || json_add_boolean update_available 0
+	json_add_string channel "$(firmware_manifest_field channel)"
+	json_add_string version "$(firmware_manifest_field version)"
+	json_add_string build_id "$remote_build"
+	json_add_string target "$(firmware_manifest_field target)"
+	json_add_string board "$(firmware_manifest_field board)"
+	json_add_string published_at "$(firmware_manifest_field published_at)"
+	json_add_string firmware_url "$(firmware_manifest_field firmware_url)"
+	json_add_string sha256 "$(firmware_manifest_field sha256)"
+	json_add_int size "$(firmware_manifest_field size)"
+	json_add_string notes_url "$(firmware_manifest_field notes_url)"
+	json_dump
+}
+
+method_firmware_remote_download() {
+	if ! firmware_remote_refresh; then
+		printf '{ "ok": false, "error": "remote_manifest_invalid" }\n'
+		return
+	fi
+	firmware_manifest_compatible || {
+		printf '{ "ok": false, "error": "firmware_not_compatible" }\n'
+		return
+	}
+
+	url="$(firmware_manifest_field firmware_url)"
+	expected_sha="$(firmware_manifest_field sha256)"
+	expected_size="$(firmware_manifest_field size)"
+	rm -f "$firmware_path" "$firmware_validation_meta"
+	if ! firmware_fetch "$url" "$firmware_path"; then
+		rm -f "$firmware_path"
+		printf '{ "ok": false, "error": "firmware_download_failed" }\n'
+		return
+	fi
+	bytes="$(wc -c < "$firmware_path" | tr -d '[:space:]')"
+	[ "$bytes" -eq "$expected_size" ] 2>/dev/null || {
+		rm -f "$firmware_path"
+		printf '{ "ok": false, "error": "download_size_mismatch" }\n'
+		return
+	}
+	sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	[ "$sha" = "$expected_sha" ] || {
+		rm -f "$firmware_path"
+		printf '{ "ok": false, "error": "download_checksum_mismatch" }\n'
+		return
+	}
+	printf '{ "ok": true, "bytes": %s, "sha256": "%s" }\n' "$bytes" "$sha"
+}
+
+method_firmware_policy_save() {
+	input="$(cat)"
+	auto_check="$(printf '%s' "$input" | jsonfilter -e '@.auto_check' 2>/dev/null)"
+	auto_download="$(printf '%s' "$input" | jsonfilter -e '@.auto_download' 2>/dev/null)"
+	auto_install="$(printf '%s' "$input" | jsonfilter -e '@.auto_install' 2>/dev/null)"
+	for value in "$auto_check" "$auto_download" "$auto_install"; do
+		case "$value" in true|false|0|1|'') ;; *) printf '{ "ok": false, "error": "invalid_update_policy" }\n'; return ;; esac
+	done
+	[ "$auto_check" = true ] && auto_check=1
+	[ "$auto_download" = true ] && auto_download=1
+	[ "$auto_install" = true ] && auto_install=1
+	[ "$auto_check" = false ] && auto_check=0
+	[ "$auto_download" = false ] && auto_download=0
+	[ "$auto_install" = false ] && auto_install=0
+
+	[ "$auto_install" = "1" ] && {
+		printf '{ "ok": false, "error": "automatic_install_requires_signed_metadata" }\n'
+		return
+	}
+	[ "$auto_download" = "1" ] && auto_check=1
+
+	uci -q batch <<EOF
+set veci.update=update
+set veci.update.auto_check='$auto_check'
+set veci.update.auto_download='$auto_download'
+set veci.update.auto_install='0'
+EOF
+	uci commit veci
+	printf '{ "ok": true }\n'
+}
+
+method_firmware_apply() {
+	input="$(cat)"
+	token="$(printf '%s' "$input" | jsonfilter -e '@.apply_token' 2>/dev/null)"
+	keep_settings="$(printf '%s' "$input" | jsonfilter -e '@.keep_settings' 2>/dev/null)"
+	[ -r "$firmware_validation_meta" ] && [ -f "$firmware_path" ] || {
+		printf '{ "ok": false, "error": "firmware_not_validated" }\n'
+		return
+	}
+	read -r validation_sha validation_board validation_token < "$firmware_validation_meta" || true
+	current_sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
+	[ -n "$token" ] && [ "$token" = "$validation_token" ] && [ "$current_sha" = "$validation_sha" ] && [ "$(firmware_board_name)" = "$validation_board" ] || {
+		printf '{ "ok": false, "error": "validation_token_mismatch" }\n'
+		return
+	}
+	case "$keep_settings" in
+		false|0) keep_settings=0 ;;
+		*) keep_settings=1 ;;
+	esac
+	rm -f "$firmware_validation_meta"
+	if [ "$keep_settings" -eq 1 ]; then
+		( sleep 2; sysupgrade "$firmware_path" >/tmp/veci-sysupgrade.log 2>&1 ) &
+	else
+		( sleep 2; sysupgrade -n "$firmware_path" >/tmp/veci-sysupgrade.log 2>&1 ) &
+	fi
+	printf '{ "ok": true, "rebooting": true }\n'
+}
+
+
 method_diagnostic() {
 	input=$(cat)
 	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
@@ -537,7 +910,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -549,6 +922,15 @@ case "$1" in
 			updateStatus) method_update_status ;;
 			apps) method_apps ;;
 			appAction) method_app_action ;;
+			firmwareStatus) method_firmware_status ;;
+			firmwareUploadStart) method_firmware_upload_start ;;
+			firmwareUploadChunk) method_firmware_upload_chunk ;;
+			firmwareUploadFinish) method_firmware_upload_finish ;;
+			firmwareValidate) method_firmware_validate ;;
+			firmwareRemoteCheck) method_firmware_remote_check ;;
+			firmwareRemoteDownload) method_firmware_remote_download ;;
+			firmwarePolicySave) method_firmware_policy_save ;;
+			firmwareApply) method_firmware_apply ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
 			diagnostic) method_diagnostic ;;
