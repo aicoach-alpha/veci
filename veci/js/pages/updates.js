@@ -1,4 +1,5 @@
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { formatBytes } from '../lib/format.js';
 
 function repoBadge(channel) {
 	switch (channel) {
@@ -24,8 +25,13 @@ export default {
 	icon: 'refresh',
 
 	async render({ api, root, toast }) {
-		const loadStatus = async () => api.veci('updateStatus', {}, { timeout: 10000 }).catch(() => ({}));
-		let status = await loadStatus();
+		const loadStatus = async () =>
+			Promise.all([
+				api.veci('updateStatus', {}, { timeout: 10000 }).catch(() => ({})),
+				api.veci('firmwareReady', {}, { timeout: 10000 }).catch(() => ({ ready: false }))
+			]);
+		let [status, ready] = await loadStatus();
+		let remote = null;
 
 		const draw = () => {
 			const packageUpdates = Number(status.package_updates) || 0;
