@@ -12,6 +12,43 @@ function defaultRouteInterface(interfaces) {
 	);
 }
 
+
+function formatQuotaBytes(raw) {
+	const value = Number(raw);
+	if (!Number.isFinite(value) || value < 0) return '—';
+	return value >= 1024 ** 3 ? (value / (1024 ** 3)).toFixed(2) + ' GB'
+		: (value / (1024 ** 2)).toFixed(1) + ' MB';
+}
+
+function indonesiaQuotaPanel(info) {
+	if (!info || info.edition !== 'indonesia') return '';
+	const total = Number(info.total_bytes);
+	const remaining = Number(info.remaining_bytes);
+	const valid = (info.status === 'ready' || info.status === 'stale') &&
+		Number.isFinite(total) && total > 0 &&
+		Number.isFinite(remaining) && remaining >= 0 && remaining <= total;
+	const percent = valid ? Math.round(100 * remaining / total) : 0;
+	const status = info.status === 'stale' ? 'Data lama' : valid ? 'Terhubung' : 'Belum terhubung';
+	const updated = valid && Number(info.updated_at) > 0
+		? new Date(Number(info.updated_at) * 1000).toLocaleString('id-ID') : '—';
+	const expires = valid && Number(info.expires_at) > 0
+		? new Date(Number(info.expires_at) * 1000).toLocaleDateString('id-ID') : '—';
+	const detail = (name, value) => '<div><span>' + name + '</span><strong>' + escapeHtml(value) + '</strong></div>';
+	const progress = valid ? '<div class="resource-row"><div class="progress-track"><span style="width:' + percent + '%"></span></div></div>' : '';
+	const message = valid ? 'Data akun operator, bukan statistik trafik router. Sumber: jembatan kuota terautentikasi.'
+		: 'Hubungkan akun XL di layanan pendamping Indonesia Edition untuk menampilkan kuota.';
+	return '<section class="content-grid"><article class="panel" data-indonesia-quota>' +
+		'<div class="panel-heading"><div><p class="eyebrow">VECI INDONESIA · OPERATOR SELULER</p><h3>Kuota XL Axiata</h3></div>' +
+		badge(status, valid && info.status === 'ready' ? 'success' : 'warning') + '</div>' +
+		'<div class="detail-list">' +
+		detail('Sisa kuota', valid ? formatQuotaBytes(remaining) : 'Belum tersedia') +
+		detail('Total kuota', valid ? formatQuotaBytes(total) : '—') +
+		detail('Terpakai', valid ? formatQuotaBytes(total - remaining) : '—') +
+		detail('Masa berlaku', expires) +
+		detail('Diperbarui', updated) + '</div>' + progress +
+		'<p class="muted">' + message + '</p></article></section>';
+}
+
 function wifiNetworks(status) {
 	return Object.values(status || {}).flatMap(radio => radio.interfaces || []);
 }
@@ -37,13 +74,14 @@ export default {
 	icon: 'home',
 
 	async render({ api, state, root, navigate, toast }) {
-		const [system, interfacesResult, wireless, wirelessConfig, clients, security] = await Promise.all([
+		const [system, interfacesResult, wireless, wirelessConfig, clients, security, indonesiaQuota] = await Promise.all([
 			api.systemInfo(),
 			api.interfaces(),
 			api.wirelessStatus().catch(() => ({})),
 			api.uciGet('wireless').catch(() => ({ values: {} })),
 			api.veci('clients').catch(() => ({ clients: [] })),
-			api.veci('securityStatus').catch(() => ({ root_password_set: true }))
+			api.veci('securityStatus').catch(() => ({ root_password_set: true })),
+			api.call('veci.indonesia', 'status', {}).catch(() => null)
 		]);
 
 		const interfaces = interfacesResult.interface || [];
@@ -126,6 +164,8 @@ export default {
 					<div><span>Security</span><strong>Firewall</strong><small>Review protection</small></div>
 				</button>
 			</section>
+
+			${indonesiaQuotaPanel(indonesiaQuota)}
 
 			<section class="content-grid content-grid-2">
 				<article class="panel">
