@@ -27,31 +27,21 @@ jobs:
       - run: pnpm test:quota
       - run: pnpm test:modem
       - run: node scripts/test-cellular-sms-storage.js
-      - name: Emit pinned minified Cellular asset fingerprints for router compatibility audit
+      - name: Identify installed WE5927 Cellular asset against historical minified releases
         run: |
           node --input-type=module <<'JS'
           import { execFileSync } from 'node:child_process';
           import { createHash } from 'node:crypto';
           import { minify } from 'terser';
-          const sources = [
-            ['BASE', 'f19603b6172854dfeca3861826017d8f1aa1268c', 'veci/js/pages/cellular.js'],
-            ['UPDATED', '88009f1fd394eeeb583f27839d29c714e31b91b6', 'veci/js/pages/cellular.js'],
-            ['FORMATTER', '88009f1fd394eeeb583f27839d29c714e31b91b6', 'veci/js/lib/messaging.js']
-          ];
-          for (const [label, commit, path] of sources) {
-            const input = execFileSync('git', ['show', commit + ':' + path], { encoding: 'utf8' });
-            const output = await minify(input, {
-              module: true,
-              compress: { dead_code: true, drop_debugger: true, passes: 2 },
-              mangle: { toplevel: true },
-              format: { comments: false }
-            });
-            if (!output.code) throw new Error(label + ' empty Terser output');
-            const b = Buffer.from(output.code);
-            const sha = createHash('sha256').update(b).digest('hex');
-            console.log('VECI_ASSET_' + label + '_SHA256=' + sha);
-            console.log('VECI_ASSET_' + label + '_BYTES=' + b.length);
-            console.log('VECI_ASSET_' + label + '_BASE64=' + b.toString('base64'));
+          const path = 'veci/js/pages/cellular.js';
+          const revisions = execFileSync('git', ['log', '--format=%H', '--all', '--', path], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+          const target = '0a4e78d5368806b31441612b8979ab7b2ac8f425890cfd89104f969accd8ee18';
+          for (const sha of revisions) {
+            const source = execFileSync('git', ['show', sha + ':' + path], { encoding: 'utf8' });
+            const out = await minify(source, { module:true, compress:{dead_code:true,drop_debugger:true,passes:2}, mangle:{toplevel:true}, format:{comments:false} });
+            const data = Buffer.from(out.code || '');
+            const hash = createHash('sha256').update(data).digest('hex');
+            console.log('HISTORICAL_CELLULAR ' + JSON.stringify({commit:sha,bytes:data.length,sha256:hash,match:hash===target}));
           }
           JS
       - run: pnpm build
