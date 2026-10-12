@@ -32,7 +32,12 @@ export function quotaSummary(payload) {
 		return { provider, primary: 'Not connected', detail: 'Carrier login is not configured', stale: false };
 	}
 	if (payload.state === 'otp_required' || payload.state === 'unauthorized') {
-		return { provider, primary: 'Sign-in required', detail: 'Authenticate with your mobile operator', stale: false };
+		return {
+			provider,
+			primary: 'Sign-in required',
+			detail: 'Authenticate with your mobile operator',
+			stale: false
+		};
 	}
 	if (payload.state === 'unavailable') {
 		return { provider, primary: 'Unavailable', detail: 'Carrier quota could not be retrieved', stale: false };
