@@ -382,16 +382,21 @@ EOF
 	rc=1
 	if [ "$action" = "remove" ]; then
 		provider="veci.app.$id"
-		if ubus list 2>/dev/null | grep -qx "$provider"; then
-			cleanup="$(ubus call "$provider" cleanup '{}' 2>/dev/null || true)"
-			if [ -n "$cleanup" ]; then
-				cleanup_ok="$(printf '%s' "$cleanup" | jsonfilter -e '@.ok' 2>/dev/null)"
-				[ "$cleanup_ok" = "true" ] || {
-					printf '{ "ok": false, "error": "app_cleanup_failed", "id": "%s" }\n' "$id"
-					return
-				}
-			fi
-		fi
+		# Never remove a package until its cleanup provider explicitly
+		# acknowledges success. A missing/busy rpcd provider is not success.
+		ubus list 2>/dev/null | grep -qx "$provider" || {
+			printf '{ "ok": false, "error": "app_cleanup_provider_missing", "id": "%s" }\n' "$id"
+			return
+		}
+		cleanup="$(ubus call "$provider" cleanup '{}' 2>/dev/null)" || {
+			printf '{ "ok": false, "error": "app_cleanup_unavailable", "id": "%s" }\n' "$id"
+			return
+		}
+		cleanup_ok="$(printf '%s' "$cleanup" | jsonfilter -e '@.ok' 2>/dev/null)"
+		[ "$cleanup_ok" = "true" ] || {
+			printf '{ "ok": false, "error": "app_cleanup_failed", "id": "%s" }\n' "$id"
+			return
+		}
 	fi
 
 	case "$manager:$action" in
@@ -444,6 +449,19 @@ firmware_build_id() {
 	if [ -r /etc/veci-release.json ]; then
 		jsonfilter -i /etc/veci-release.json -e '@.build_id' 2>/dev/null | tr -cd 'A-Fa-f0-9'
 	fi
+}
+
+# The apply token is short lived and single-use, and bound to the
+# validated image digest plus this board. Clock rollback must fail closed.
+firmware_validation_max_age=600
+firmware_validation_fresh() {
+	issued="$1"
+	case "$issued" in ''|*[!0-9]*) return 1 ;; esac
+	now="$(date +%s 2>/dev/null)" || return 1
+	case "$now" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$issued" -gt 0 ] 2>/dev/null &&
+		[ "$now" -ge "$issued" ] 2>/dev/null &&
+		[ $((now - issued)) -le "$firmware_validation_max_age" ] 2>/dev/null
 }
 
 firmware_token() {
@@ -574,8 +592,8 @@ method_firmware_status() {
 		command -v sha256sum >/dev/null 2>&1 && sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
 	fi
 	if [ -r "$firmware_validation_meta" ]; then
-		read -r validation_sha validation_board validation_token validation_signature < "$firmware_validation_meta" || true
-		if [ -n "$sha" ] && [ "$validation_sha" = "$sha" ] && [ "$validation_board" = "$(firmware_board_name)" ]; then
+		read -r validation_sha validation_board validation_token validation_signature validation_issued < "$firmware_validation_meta" || true
+		if [ -n "$sha" ] && [ "$validation_sha" = "$sha" ] && [ "$validation_board" = "$(firmware_board_name)" ] && firmware_validation_fresh "$validation_issued"; then
 			validated=true
 			[ -n "$validation_token" ] && token_ready=true
 		fi
@@ -765,7 +783,15 @@ method_firmware_validate() {
 
 	board="$(firmware_board_name)"
 	token="$(firmware_token)"
-	printf '%s %s %s %s\n' "$sha" "$board" "$token" "$signature_state" > "$firmware_validation_meta"
+	issued="$(date +%s 2>/dev/null)"
+	firmware_validation_fresh "$issued" && [ -n "$board" ] && [ -n "$token" ] || {
+		printf '{ "ok": false, "error": "validation_clock_or_identity_unavailable" }\n'
+		return
+	}
+	printf '%s %s %s %s %s\n' "$sha" "$board" "$token" "$signature_state" "$issued" > "$firmware_validation_meta" || {
+		printf '{ "ok": false, "error": "validation_metadata_write_failed" }\n'
+		return
+	}
 	printf '{ "ok": true, "validated": true, "signature_verified": %s, "board": "%s", "bytes": %s, "sha256": "%s", "apply_token": "%s" }\n' \
 		"$([ "$signature_state" = signed ] && printf true || printf false)" "$board" "$bytes" "$sha" "$token"
 }
@@ -898,7 +924,12 @@ method_firmware_apply() {
 		printf '{ "ok": false, "error": "firmware_not_validated" }\n'
 		return
 	}
-	read -r validation_sha validation_board validation_token validation_signature < "$firmware_validation_meta" || true
+	read -r validation_sha validation_board validation_token validation_signature validation_issued < "$firmware_validation_meta" || true
+	firmware_validation_fresh "$validation_issued" || {
+		rm -f "$firmware_validation_meta"
+		printf '{ "ok": false, "error": "validation_token_expired" }\n'
+		return
+	}
 	current_sha="$(sha256sum "$firmware_path" | awk '{ print $1 }')"
 	[ -n "$token" ] && [ "$token" = "$validation_token" ] && [ "$current_sha" = "$validation_sha" ] && [ "$(firmware_board_name)" = "$validation_board" ] || {
 		printf '{ "ok": false, "error": "validation_token_mismatch" }\n'
