@@ -12,7 +12,8 @@ export function smsStorageLabel(result) {
 		used > total ||
 		typeof memory !== 'string' ||
 		!/^[A-Z]{2}$/.test(memory)
-	) return 'Unavailable';
+	)
+		return 'Unavailable';
 	return `${used} / ${total} (${memory})`;
 }
 
