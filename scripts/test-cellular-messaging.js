@@ -5,15 +5,30 @@ import { smsStorageLabel, smsFeaturesLabel, ussdCapabilityLabel } from '../veci/
 const good = { ok: true, source: 'read_only_at_cpms', memory: 'ME', used: 5, total: 255 };
 assert.equal(smsStorageLabel(good), '5 / 255 (ME)');
 for (const entry of [
-	{ ...good, used: '5' }, { ...good, total: '255' },
-	{ ...good, used: -1 }, { ...good, used: 256 }, { ...good, total: 0 },
-	{ ...good, total: 999999 }, { ...good, memory: '<script>' },
-	{ ...good, memory: '\n' }, { ...good, memory: 'ME";alert(1)' },
-	{ ...good, ok: false }, { ...good, source: 'other' }, {},
-	{ ...good, used: NaN }, { ...good, total: Infinity }
-]) assert.equal(smsStorageLabel(entry), 'Unavailable');
-const capabilities = { ok: true, source: 'read_only_at_test', sms_mode: 'supported',
-	sms_storage: 'supported', sms_notifications: 'supported', ussd: 'supported' };
+	{ ...good, used: '5' },
+	{ ...good, total: '255' },
+	{ ...good, used: -1 },
+	{ ...good, used: 256 },
+	{ ...good, total: 0 },
+	{ ...good, total: 999999 },
+	{ ...good, memory: '<script>' },
+	{ ...good, memory: '\n' },
+	{ ...good, memory: 'ME";alert(1)' },
+	{ ...good, ok: false },
+	{ ...good, source: 'other' },
+	{},
+	{ ...good, used: NaN },
+	{ ...good, total: Infinity }
+])
+	assert.equal(smsStorageLabel(entry), 'Unavailable');
+const capabilities = {
+	ok: true,
+	source: 'read_only_at_test',
+	sms_mode: 'supported',
+	sms_storage: 'supported',
+	sms_notifications: 'supported',
+	ussd: 'supported'
+};
 assert.equal(smsFeaturesLabel(capabilities), 'Supported');
 assert.equal(ussdCapabilityLabel(capabilities), 'Supported (test only)');
 assert.equal(smsFeaturesLabel({ ...capabilities, sms_notifications: 'unknown' }), 'Unavailable');
@@ -35,8 +50,16 @@ assert.match(api, /this\.call\('veci\.cellular', 'messagingCapabilities', \{\}\)
 
 // Privacy regression: neither UI nor RPC API may dispatch inbox listing,
 // arbitrary AT commands, SMS content retrieval or USSD sessions.
-for (const forbidden of ['CMGL', 'CMGR', 'CUSD', 'sendSms', 'readSms', 'ussdExecute',
-	'innerHTML = storage', 'innerHTML = capabilities']) {
+for (const forbidden of [
+	'CMGL',
+	'CMGR',
+	'CUSD',
+	'sendSms',
+	'readSms',
+	'ussdExecute',
+	'innerHTML = storage',
+	'innerHTML = capabilities'
+]) {
 	assert.equal(ui.includes(forbidden) || api.includes(forbidden), false, forbidden);
 }
 console.log('CELLULAR_MESSAGING_METADATA_UI_PASS');
