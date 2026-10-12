@@ -83,11 +83,70 @@ export default {
 				</section>
 			</div>
 
+			<section class="panel" aria-labelledby="cellular-messaging-title">
+				<div class="panel-heading">
+					<div>
+						<p class="eyebrow">MESSAGING</p>
+						<h3 id="cellular-messaging-title">SMS &amp; USSD</h3>
+					</div>
+					<span class="badge">On demand</span>
+				</div>
+				<p>Check SMS storage and modem capabilities on this router. Nothing is fetched automatically.</p>
+				<div class="detail-list" aria-live="polite">
+					<div><span>SMS storage</span><strong id="cellular-sms-storage">Not checked</strong></div>
+					<div><span>SMS features</span><strong id="cellular-sms-capabilities">Not checked</strong></div>
+					<div><span>USSD support</span><strong id="cellular-ussd-capability">Not checked</strong></div>
+				</div>
+				<div class="cellular-actions">
+					<button class="button button-secondary" id="cellular-check-messaging" type="button">Check messaging status</button>
+				</div>
+				<div class="notice-card">
+					<strong>SMS Inbox is not enabled yet</strong>
+					<p>Listing messages may mark unread SMS as read. This page never opens messages, displays OTP, or runs interactive USSD. Inbox will require explicit consent and a separate authenticated service.</p>
+				</div>
+			</section>
+
 			<div class="notice-card">
 				<strong>Hardware-aware integration</strong>
 				<p>VeCI Core does not assume a specific modem or router. This page appears only when the firmware exposes the standard <code>veci.cellular</code> provider.</p>
 			</div>
 		`;
+
+		const checkMessaging = root.querySelector('#cellular-check-messaging');
+		checkMessaging?.addEventListener('click', async () => {
+			setBusy(checkMessaging, true, 'Checking…');
+			const storageNode = root.querySelector('#cellular-sms-storage');
+			const featuresNode = root.querySelector('#cellular-sms-capabilities');
+			const ussdNode = root.querySelector('#cellular-ussd-capability');
+			try {
+				const [storage, capabilities] = await Promise.allSettled([
+					api.cellularMessagingStorage(),
+					api.cellularMessagingCapabilities()
+				]);
+				if (storage.status === 'fulfilled' && storage.value?.ok === true) {
+					const used = Number(storage.value.used);
+					const total = Number(storage.value.total);
+					const memory = storage.value.memory;
+					if (Number.isSafeInteger(used) && Number.isSafeInteger(total) &&
+						used >= 0 && total > 0 && used <= total && total <= 65535 &&
+						/^[A-Z]{2}$/.test(memory || '')) {
+						storageNode.textContent = `${used} / ${total} (${memory})`;
+					} else storageNode.textContent = 'Unavailable';
+				} else storageNode.textContent = 'Unavailable';
+				const caps = capabilities.status === 'fulfilled' && capabilities.value?.ok === true
+					? capabilities.value : null;
+				const sms = ['sms_mode', 'sms_storage', 'sms_notifications'];
+				featuresNode.textContent = caps && sms.every(key => caps[key] === 'supported')
+					? 'Supported' : 'Unavailable';
+				ussdNode.textContent = caps?.ussd === 'supported' ? 'Supported (test only)' : 'Unavailable';
+			} catch {
+				storageNode.textContent = 'Unavailable';
+				featuresNode.textContent = 'Unavailable';
+				ussdNode.textContent = 'Unavailable';
+			} finally {
+				setBusy(checkMessaging, false);
+			}
+		});
 
 		const reconnect = root.querySelector('#cellular-reconnect');
 		reconnect?.addEventListener('click', async () => {
