@@ -20,6 +20,14 @@ jobs:
         with:
           version: 8.15.9
       - run: pnpm install --frozen-lockfile
+      - name: Format diagnostics for added source
+        run: |
+          echo '===FORMATTED_MESSAGING_BEGIN==='
+          pnpm exec prettier veci/js/lib/messaging.js
+          echo '===FORMATTED_MESSAGING_END==='
+          echo '===FORMATTED_TEST_BEGIN==='
+          pnpm exec prettier scripts/test-cellular-messaging.js
+          echo '===FORMATTED_TEST_END==='
       - run: pnpm format:check
       - run: pnpm exec eslint veci demo scripts eslint.config.js --max-warnings=0
       - run: node scripts/test-cellular-messaging.js
