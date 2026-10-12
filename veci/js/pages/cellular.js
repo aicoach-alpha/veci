@@ -1,4 +1,5 @@
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { smsStorageLabel } from '../lib/messaging.js';
 
 function metric(label, value, suffix = '') {
 	const display = value === undefined || value === null || value === '' ? '—' : `${value}${suffix}`;
@@ -121,12 +122,15 @@ export default {
 				<div class="detail-list">
 					<div><span>SMS mode</span><strong id="cellular-sms-mode">Not checked</strong></div>
 					<div><span>SMS storage</span><strong id="cellular-sms-storage">Not checked</strong></div>
+					<div><span>Stored SMS slots</span><strong id="cellular-sms-storage-count">Not checked</strong></div>
 					<div><span>Incoming SMS notifications</span><strong id="cellular-sms-notifications">Not checked</strong></div>
 					<div><span>USSD support</span><strong id="cellular-ussd-support">Not checked</strong></div>
 				</div>
 				<div class="cellular-actions">
 					<button class="button button-secondary" id="cellular-messaging-probe" type="button">Check modem capabilities</button>
+					<button class="button button-secondary" id="cellular-messaging-storage" type="button">Check stored SMS count</button>
 				</div>
+				<p>SMS Inbox is not enabled yet. Listing real messages can mark unread SMS as read. Checking storage here does not list messages or retrieve SMS contents.</p>
 			</section>
 
 			<div class="notice-card">
@@ -183,6 +187,24 @@ export default {
 				toast('This router does not currently expose SMS/USSD diagnostics.', 'warning');
 			} finally {
 				setBusy(capabilityButton, false);
+			}
+		});
+
+		// Live v2 metadata-only RPC. Never invoke CMGL, CMGR, CUSD, SMS
+		// content retrieval or automatic background polling.
+		const storageButton = root.querySelector('#cellular-messaging-storage');
+		storageButton?.addEventListener('click', async () => {
+			setBusy(storageButton, true, 'Checking storage…');
+			const node = root.querySelector('#cellular-sms-storage-count');
+			try {
+				const storage = await api.call('veci.cellular', 'messagingStorage', {}, { timeout: 4000 });
+				if (node) node.textContent = smsStorageLabel(storage);
+				if (storage?.ok !== true) toast('SMS storage status is currently unavailable.', 'warning');
+			} catch {
+				if (node) node.textContent = 'Unavailable';
+				toast('SMS storage status is not available on this router.', 'warning');
+			} finally {
+				setBusy(storageButton, false);
 			}
 		});
 
