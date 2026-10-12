@@ -113,6 +113,22 @@ export default {
 				</section>
 			</div>
 
+			<section class="panel" id="cellular-messaging-panel">
+				<div class="panel-heading">
+					<div><p class="eyebrow">MODEM SERVICES</p><h3>SMS &amp; USSD</h3></div>
+				</div>
+				<p>Check whether the modem exposes SMS and USSD AT commands. This diagnostic only sends read-only AT test queries; it does not open an SMS inbox, send a message, request an OTP or execute a USSD code.</p>
+				<div class="detail-list">
+					<div><span>SMS mode</span><strong id="cellular-sms-mode">Not checked</strong></div>
+					<div><span>SMS storage</span><strong id="cellular-sms-storage">Not checked</strong></div>
+					<div><span>Incoming SMS notifications</span><strong id="cellular-sms-notifications">Not checked</strong></div>
+					<div><span>USSD support</span><strong id="cellular-ussd-support">Not checked</strong></div>
+				</div>
+				<div class="cellular-actions">
+					<button class="button button-secondary" id="cellular-messaging-probe" type="button">Check modem capabilities</button>
+				</div>
+			</section>
+
 			<div class="notice-card">
 				<strong>Modem identity diagnostics (on demand)</strong>
 				<p>Cached identity comes from the router LTE manager and can be stale. Live identity uses the AT+CGSN read-only query on the connected modem. Both values are revealed only when requested, are hidden after 60 seconds, and are never saved by VeCI. The separate MiFi web interface may report a different device or data source; a mismatch must be investigated before drawing conclusions. VeCI never changes the IMEI.</p>
@@ -135,6 +151,40 @@ export default {
 					if (value) value.textContent = 'Not verified';
 				});
 		}
+
+		// Explicit test-only AT query. Never poll this during page navigation:
+		// older modems can reject or delay requests while data service is active.
+		const capabilityButton = root.querySelector('#cellular-messaging-probe');
+		capabilityButton?.addEventListener('click', async () => {
+			setBusy(capabilityButton, true, 'Checking modem…');
+			try {
+				const result = await api.call('veci.cellular', 'messagingCapabilities', {}, { timeout: 11000 });
+				const fields = {
+					sms_mode: '#cellular-sms-mode',
+					sms_storage: '#cellular-sms-storage',
+					sms_notifications: '#cellular-sms-notifications',
+					ussd: '#cellular-ussd-support'
+				};
+				const states = {
+					supported: 'AT command supported',
+					rejected: 'Modem rejected command',
+					unknown: 'Unable to confirm',
+					unavailable: 'Modem unavailable',
+					not_tested: 'Not tested'
+				};
+				for (const [field, selector] of Object.entries(fields)) {
+					const node = root.querySelector(selector);
+					if (node) node.textContent = states[result[field]] || states.unknown;
+				}
+				if (!result.ok) {
+					toast('The AT interface is busy or unsupported; no SMS or USSD was sent.', 'warning');
+				}
+			} catch {
+				toast('This router does not currently expose SMS/USSD diagnostics.', 'warning');
+			} finally {
+				setBusy(capabilityButton, false);
+			}
+		});
 
 		const imeiButton = root.querySelector('#cellular-imei-toggle');
 		const liveButton = root.querySelector('#cellular-imei-live');
