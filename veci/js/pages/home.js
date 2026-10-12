@@ -162,7 +162,6 @@ export default {
 			</section>
 		`;
 
-
 		// Only the optional Indonesia package implements this ubus object.
 		// General remains unchanged. Status must be a local, read-only cache:
 		// never trigger OTP or a remote carrier request while rendering Home.
