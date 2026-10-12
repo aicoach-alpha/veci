@@ -20,6 +20,10 @@ jobs:
         with:
           version: 8.15.9
       - run: pnpm install --frozen-lockfile
+      - name: Show exact formatting diff for new modem parser (diagnostic only)
+        run: |
+          pnpm exec prettier veci/js/lib/modem-messages.js > /tmp/modem-messages.prettier.js
+          diff -u veci/js/lib/modem-messages.js /tmp/modem-messages.prettier.js || true
       - run: pnpm format:check
       - run: pnpm exec eslint veci demo scripts eslint.config.js --max-warnings=0
       - run: pnpm build
