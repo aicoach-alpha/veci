@@ -1,4 +1,5 @@
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { smsStorageLabel, smsFeaturesLabel, ussdCapabilityLabel } from '../lib/messaging.js';
 
 function metric(label, value, suffix = '') {
 	const display = value === undefined || value === null || value === '' ? '—' : `${value}${suffix}`;
@@ -123,22 +124,11 @@ export default {
 					api.cellularMessagingStorage(),
 					api.cellularMessagingCapabilities()
 				]);
-				if (storage.status === 'fulfilled' && storage.value?.ok === true) {
-					const used = Number(storage.value.used);
-					const total = Number(storage.value.total);
-					const memory = storage.value.memory;
-					if (Number.isSafeInteger(used) && Number.isSafeInteger(total) &&
-						used >= 0 && total > 0 && used <= total && total <= 65535 &&
-						/^[A-Z]{2}$/.test(memory || '')) {
-						storageNode.textContent = `${used} / ${total} (${memory})`;
-					} else storageNode.textContent = 'Unavailable';
-				} else storageNode.textContent = 'Unavailable';
-				const caps = capabilities.status === 'fulfilled' && capabilities.value?.ok === true
-					? capabilities.value : null;
-				const sms = ['sms_mode', 'sms_storage', 'sms_notifications'];
-				featuresNode.textContent = caps && sms.every(key => caps[key] === 'supported')
-					? 'Supported' : 'Unavailable';
-				ussdNode.textContent = caps?.ussd === 'supported' ? 'Supported (test only)' : 'Unavailable';
+				const storageData = storage.status === 'fulfilled' ? storage.value : null;
+				const capabilityData = capabilities.status === 'fulfilled' ? capabilities.value : null;
+				storageNode.textContent = smsStorageLabel(storageData);
+				featuresNode.textContent = smsFeaturesLabel(capabilityData);
+				ussdNode.textContent = ussdCapabilityLabel(capabilityData);
 			} catch {
 				storageNode.textContent = 'Unavailable';
 				featuresNode.textContent = 'Unavailable';
