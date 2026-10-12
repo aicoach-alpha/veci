@@ -135,6 +135,16 @@ export class VeciApi {
 		return this.call('veci.cellular', 'status', {});
 	}
 
+	// Only fixed metadata RPCs already proved LIVE on WE5927 v2.
+	// No general AT command, inbox listing, SMS body or USSD session.
+	cellularMessagingStorage() {
+		return this.call('veci.cellular', 'messagingStorage', {});
+	}
+
+	cellularMessagingCapabilities() {
+		return this.call('veci.cellular', 'messagingCapabilities', {});
+	}
+
 	cellularAction(method, params = {}) {
 		if (!['reconnect', 'switchSim'].includes(method)) throw new Error('Unsupported cellular action');
 		return this.call('veci.cellular', method, params);
