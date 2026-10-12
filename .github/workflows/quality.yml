@@ -25,6 +25,33 @@ jobs:
       - run: pnpm test:quota
       - run: pnpm test:modem
       - run: node scripts/test-cellular-sms-storage.js
+      - name: Emit pinned minified Cellular asset fingerprints for router compatibility audit
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { minify } from 'terser';
+          const sources = [
+            ['BASE', 'f19603b6172854dfeca3861826017d8f1aa1268c', 'veci/js/pages/cellular.js'],
+            ['UPDATED', '88009f1fd394eeeb583f27839d29c714e31b91b6', 'veci/js/pages/cellular.js'],
+            ['FORMATTER', '88009f1fd394eeeb583f27839d29c714e31b91b6', 'veci/js/lib/messaging.js']
+          ];
+          for (const [label, commit, path] of sources) {
+            const input = execFileSync('git', ['show', commit + ':' + path], { encoding: 'utf8' });
+            const output = await minify(input, {
+              module: true,
+              compress: { dead_code: true, drop_debugger: true, passes: 2 },
+              mangle: { toplevel: true },
+              format: { comments: false }
+            });
+            if (!output.code) throw new Error(label + ' empty Terser output');
+            const b = Buffer.from(output.code);
+            const sha = createHash('sha256').update(b).digest('hex');
+            console.log('VECI_ASSET_' + label + '_SHA256=' + sha);
+            console.log('VECI_ASSET_' + label + '_BYTES=' + b.length);
+            console.log('VECI_ASSET_' + label + '_BASE64=' + b.toString('base64'));
+          }
+          JS
       - run: pnpm build
       - run: node scripts/build-demo.js
 
