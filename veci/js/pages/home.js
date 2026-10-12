@@ -1,6 +1,7 @@
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
 import { formatBytes, formatDuration, formatMemory, firstAddress } from '../lib/format.js';
 import { icon } from '../lib/icons.js';
+import { quotaSummary } from '../lib/quota.js';
 
 function defaultRouteInterface(interfaces) {
 	return (
@@ -127,6 +128,8 @@ export default {
 				</button>
 			</section>
 
+			<section class="metric-grid" id="home-carrier-quota-slot" hidden></section>
+
 			<section class="content-grid content-grid-2">
 				<article class="panel">
 					<div class="panel-heading">
@@ -158,6 +161,31 @@ export default {
 				</article>
 			</section>
 		`;
+
+
+		// Only the optional Indonesia package implements this ubus object.
+		// General remains unchanged. Status must be a local, read-only cache:
+		// never trigger OTP or a remote carrier request while rendering Home.
+		api.call('veci.quota', 'status', {}, { timeout: 1500 })
+			.then(result => {
+				const summary = quotaSummary(result);
+				const slot = root.querySelector('#home-carrier-quota-slot');
+				if (!summary || !slot) return;
+				slot.innerHTML = `
+					<article class="metric-card">
+						<span class="metric-icon">${icon('signal', 'svg-icon')}</span>
+						<div>
+							<span>${escapeHtml(summary.provider)} quota</span>
+							<strong>${escapeHtml(summary.primary)}</strong>
+							<small>${escapeHtml(summary.detail)}</small>
+						</div>
+					</article>
+				`;
+				slot.hidden = false;
+			})
+			.catch(() => {
+				// Expected when VeCI Indonesia's optional package is not installed.
+			});
 
 		if (uplink) {
 			api.veci('internetStatus', {}, { timeout: 3000 })
