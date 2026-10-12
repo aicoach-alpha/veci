@@ -43,9 +43,10 @@ export function quotaSummary(payload) {
 	if (payload.source !== 'carrier_authenticated' || !validBytes(payload.remaining_bytes)) {
 		return { provider, primary: 'Unavailable', detail: 'Verified carrier quota not available', stale: false };
 	}
-	const total = validBytes(payload.total_bytes) && payload.total_bytes >= payload.remaining_bytes
-		? ` of ${showBytes(payload.total_bytes)}`
-		: '';
+	const total =
+		validBytes(payload.total_bytes) && payload.total_bytes >= payload.remaining_bytes
+			? ` of ${showBytes(payload.total_bytes)}`
+			: '';
 	return {
 		provider,
 		primary: showBytes(payload.remaining_bytes),
