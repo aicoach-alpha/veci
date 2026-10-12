@@ -4,7 +4,14 @@
 	"private": true,
 	"type": "module",
 	"description": "VeCI - Easy Configuration Interface for OpenWrt",
-	"keywords": ["openwrt", "ubus", "uci", "router", "management", "web-ui"],
+	"keywords": [
+		"openwrt",
+		"ubus",
+		"uci",
+		"router",
+		"management",
+		"web-ui"
+	],
 	"license": "MIT",
 	"scripts": {
 		"dev": "node scripts/serve.js",
@@ -12,8 +19,9 @@
 		"format": "prettier --write \"veci/**/*.{js,css,html,json}\" \"scripts/**/*.js\"",
 		"format:check": "prettier --check \"veci/**/*.{js,css,html,json}\" \"scripts/**/*.js\"",
 		"lint": "eslint veci scripts eslint.config.js",
-		"check": "pnpm format:check && pnpm exec eslint veci scripts eslint.config.js --max-warnings=0 && pnpm build",
-		"prepare": "git config core.hooksPath .githooks"
+		"check": "pnpm format:check && pnpm exec eslint veci scripts eslint.config.js --max-warnings=0 && pnpm build && pnpm test:quota",
+		"prepare": "git config core.hooksPath .githooks",
+		"test:quota": "node --test tests/quota.test.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "9.39.1",
