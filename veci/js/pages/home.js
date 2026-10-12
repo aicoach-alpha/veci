@@ -128,7 +128,7 @@ export default {
 				</button>
 			</section>
 
-			<section class="metric-grid" id="home-carrier-quota-slot" hidden></section>
+			<section class="metric-grid hidden" id="home-carrier-quota-slot"></section>
 
 			<section class="content-grid content-grid-2">
 				<article class="panel">
@@ -180,7 +180,7 @@ export default {
 						</div>
 					</article>
 				`;
-				slot.hidden = false;
+				slot.classList.remove('hidden');
 			})
 			.catch(() => {
 				// Expected when VeCI Indonesia's optional package is not installed.
