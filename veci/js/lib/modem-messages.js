@@ -10,9 +10,7 @@ export function parseSmsTextList(raw) {
 	const records = [];
 	let current = null;
 	for (const line of raw.replaceAll('\r', '').split('\n')) {
-		const head = /^\+CMGL:\s*(\d{1,3}),"(REC READ|REC UNREAD|STO SENT|STO UNSENT)","([^"\r\n]{0,24})",(?:"([^"\r\n]*)")?,?"([^"\r\n]{0,48})"(?:,.*)?$/.exec(
-			line
-		);
+		const head = /^\+CMGL:\s*(\d{1,3}),"(REC READ|REC UNREAD|STO SENT|STO UNSENT)","([^"\r\n]{0,24})",(?:"([^"\r\n]*)")?,?"([^"\r\n]{0,48})"(?:,.*)?$/.exec(line);
 		if (head) {
 			if (current) records.push(current);
 			current = {
