@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { smsStorageLabel } from '../veci/js/lib/messaging.js';
+
+const sample = { ok: true, source: 'read_only_at_cpms', memory: 'ME', used: 5, total: 255 };
+assert.equal(smsStorageLabel(sample), '5 / 255 (ME)');
+assert.equal(smsStorageLabel({ ...sample, used: -1 }), 'Unavailable');
+assert.equal(smsStorageLabel({ ...sample, used: '5' }), 'Unavailable');
+assert.equal(smsStorageLabel({ ...sample, total: 0 }), 'Unavailable');
+assert.equal(smsStorageLabel({ ...sample, total: 65536 }), 'Unavailable');
+assert.equal(smsStorageLabel({ ...sample, used: 256 }), 'Unavailable');
+assert.equal(smsStorageLabel({ ...sample, memory: '<script>' }), 'Unavailable');
+assert.equal(smsStorageLabel({ ...sample, source: 'raw_at' }), 'Unavailable');
+assert.equal(smsStorageLabel({ ...sample, ok: false }), 'Unavailable');
+assert.equal(smsStorageLabel({}), 'Unavailable');
+
+const ui = readFileSync(new URL('../veci/js/pages/cellular.js', import.meta.url), 'utf8');
+assert.match(ui, /id="cellular-messaging-storage"/);
+assert.match(ui, /id="cellular-sms-storage-count"/);
+assert.match(ui, /storageButton\?\.addEventListener\('click'/);
+assert.match(ui, /'veci\.cellular', 'messagingStorage'/);
+assert.match(ui, /smsStorageLabel\(storage\)/);
+assert.match(ui, /SMS Inbox is not enabled yet/);
+assert.match(ui, /id="cellular-messaging-probe"/);
+assert.match(ui, /id="cellular-imei-toggle"/);
+assert.match(ui, /id="cellular-imei-live"/);
+assert.match(ui, /id="cellular-reconnect"/);
+assert.match(ui, /id="cellular-switch-sim"/);
+assert.doesNotMatch(ui, /AT\+CMGL=4/);
+assert.doesNotMatch(ui, /AT\+CMGR=/);
+assert.doesNotMatch(ui, /AT\+CUSD=1/);
+console.log('CELLULAR_STORAGE_UI_METADATA_ONLY_PASS');
