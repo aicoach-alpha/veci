@@ -1,4 +1,5 @@
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
+import { quotaSummary } from '../lib/quota.js';
 
 function metric(label, value, suffix = '') {
 	const display = value === undefined || value === null || value === '' ? '—' : `${value}${suffix}`;
@@ -38,6 +39,16 @@ export default {
 		const model = status.model || status.manufacturer || 'Cellular modem';
 		const operator = normalizeOperator(status.operator);
 		const technology = status.access_tech || status.registration_status || 'Unknown';
+
+		// Optional operator integration. One local read-only ubus call,
+		// never an OTP request, provider HTTP call, or modem AT command.
+		// The General edition has no veci.quota object: hide this panel.
+		let quota = null;
+		try {
+			quota = quotaSummary(await api.call('veci.quota', 'status', {}, { timeout: 1500 }));
+		} catch {
+			// Provider is optional and must not break Cellular or change modem state.
+		}
 
 		root.innerHTML = `
 			<div class="page-intro">
@@ -113,6 +124,26 @@ export default {
 				</section>
 			</div>
 
+			${quota ? `
+			<section class="panel" id="cellular-quota-panel">
+				<div class="panel-heading">
+					<div>
+						<p class="eyebrow">INDONESIA · OPERATOR</p>
+						<h3>${escapeHtml(quota.provider)} data quota</h3>
+					</div>
+					${badge(quota.stale ? 'Expired' : quota.primary === 'Not connected' ? 'Not connected' : quota.primary === 'Unavailable' ? 'Unavailable' : 'Local status', quota.stale || quota.primary === 'Not connected' ? 'warning' : 'neutral')}
+				</div>
+				<div class="detail-list">
+					<div><span>Operator</span><strong>${escapeHtml(quota.provider)}</strong></div>
+					<div><span>Remaining quota / status</span><strong id="cellular-quota-primary">${escapeHtml(quota.primary)}</strong></div>
+					<div><span>Information</span><strong id="cellular-quota-detail">${escapeHtml(quota.detail)}</strong></div>
+				</div>
+				<p class="panel-copy">Operator quota is separate from router traffic usage. Only a verified authenticated operator response can display a balance.</p>
+				<div class="cellular-actions">
+					<button class="button button-secondary" id="cellular-quota-refresh" type="button">Refresh local quota status</button>
+				</div>
+			</section>` : ''}
+
 			<section class="panel" id="cellular-messaging-panel">
 				<div class="panel-heading">
 					<div><p class="eyebrow">MODEM SERVICES</p><h3>SMS &amp; USSD</h3></div>
@@ -135,6 +166,27 @@ export default {
 				<p>VeCI Core remains hardware-independent. This page is available when the router exposes <code>veci.cellular</code>.</p>
 			</div>
 		`;
+
+		// Local cache refresh: no carrier login, SMS, USSD, or network operation.
+		const quotaRefresh = root.querySelector('#cellular-quota-refresh');
+		quotaRefresh?.addEventListener('click', async () => {
+			setBusy(quotaRefresh, true, 'Refreshing…');
+			try {
+				const latest = quotaSummary(await api.call('veci.quota', 'status', {}, { timeout: 1500 }));
+				if (!latest || latest.provider !== quota.provider) {
+					toast('Operator quota status is unavailable.', 'warning');
+					return;
+				}
+				const value = root.querySelector('#cellular-quota-primary');
+				const detail = root.querySelector('#cellular-quota-detail');
+				if (value) value.textContent = latest.primary;
+				if (detail) detail.textContent = latest.detail;
+			} catch {
+				toast('Could not read local operator quota status.', 'warning');
+			} finally {
+				setBusy(quotaRefresh, false);
+			}
+		});
 
 		if (online) {
 			api.veci('internetStatus', {}, { timeout: 3000 })
