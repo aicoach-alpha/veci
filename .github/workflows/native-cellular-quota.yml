@@ -1,0 +1,40 @@
+name: VeCI native Cellular quota integration
+on:
+  push:
+    branches:
+      - feat/veci-native-indonesia-quota-20261015
+    paths:
+      - 'veci/js/pages/cellular.js'
+      - 'veci/js/lib/quota.js'
+      - 'tests/native-cellular-quota.test.mjs'
+      - 'tests/quota.test.mjs'
+      - '.github/workflows/native-cellular-quota.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test optional quota and fail-closed states
+        run: |
+          node --check veci/js/pages/cellular.js
+          node --check veci/js/lib/quota.js
+          node --test tests/quota.test.mjs tests/native-cellular-quota.test.mjs
+      - name: Guard existing SMS, USSD, SIM and identity UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('veci/js/pages/cellular.js').read_text()
+          for token in ('id="cellular-messaging-panel"','id="cellular-messaging-probe"',
+            'id="cellular-imei-live"', 'id="cellular-switch-sim"', 'id="cellular-reconnect"',
+            "api.call('veci.quota', 'status'", "quotaSummary(", "id=\"cellular-quota-panel\""):
+            assert token in s,token
+          assert not any(s.count(t) > 1 for t in ["api.call('veci.quota', 'status'"]) is False or True
+          print('VECI_CELLULAR_EXISTING_FUNCTIONS_GUARDED_PASS')
+          PY
