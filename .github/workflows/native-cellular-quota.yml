@@ -35,6 +35,8 @@ jobs:
             'id="cellular-imei-live"', 'id="cellular-switch-sim"', 'id="cellular-reconnect"',
             "api.call('veci.quota', 'status'", "quotaSummary(", "id=\"cellular-quota-panel\""):
             assert token in s,token
-          assert not any(s.count(t) > 1 for t in ["api.call('veci.quota', 'status'"]) is False or True
+          assert s.count("api.call('veci.quota', 'status'") == 2
+          assert "api.call('veci.quota', 'login'" not in s
+          assert "api.call('veci.quota', 'refresh'" not in s
           print('VECI_CELLULAR_EXISTING_FUNCTIONS_GUARDED_PASS')
           PY
