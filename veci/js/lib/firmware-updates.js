@@ -1,7 +1,7 @@
 /* Manual/OTA firmware management via existing VeCI RPC.
  * Never flash without a signed validation token and user confirmation.
  */
-export async function bindFirmwareUpdates({ api, root, toast, confirm }) {
+export async function bindFirmwareUpdates({ api, root, toast, confirm, nativeFirmwareCheck }) {
 	const find = id => root.querySelector('#' + id);
 	const info = find('fw-status'),
 		otaInfo = find('fw-ota-status');
@@ -112,6 +112,15 @@ export async function bindFirmwareUpdates({ api, root, toast, confirm }) {
 		guarded(async () => {
 			ota = null;
 			refresh();
+			// Board-native channel check fails closed on unsigned releases.
+			const native = typeof nativeFirmwareCheck === 'function'
+				? await nativeFirmwareCheck().catch(() => null) : null;
+			if (native?.ok === true && ['no_release', 'unverified_release'].includes(native.state)) {
+				otaInfo.textContent = native.state === 'no_release'
+					? 'No OTA firmware release has been published.'
+					: 'OTA release metadata is not verified. Download and flashing blocked.';
+				return;
+			}
 			const result = ok(await call('firmwareRemoteCheck', {}, 30000));
 			if (result.available !== true) otaInfo.textContent = 'No OTA firmware release has been published.';
 			else if (result.compatible !== true)
