@@ -115,14 +115,13 @@ export default {
 
 			<section class="panel" id="cellular-messaging-panel">
 				<div class="panel-heading">
-					<div><p class="eyebrow">MODEM SERVICES</p><h3>SMS &amp; USSD</h3></div>
+					<div><p class="eyebrow">MODEM SERVICES</p><h3>SMS diagnostics</h3></div>
 				</div>
-				<p>Check whether the modem exposes SMS and USSD AT commands. This diagnostic only sends read-only AT test queries; it does not open an SMS inbox, send a message, request an OTP or execute a USSD code.</p>
+				<p>Check whether the modem exposes SMS status commands. This diagnostic does not open the inbox, send messages, or request an OTP.</p>
 				<div class="detail-list">
 					<div><span>SMS mode</span><strong id="cellular-sms-mode">Not checked</strong></div>
 					<div><span>SMS storage</span><strong id="cellular-sms-storage">Not checked</strong></div>
 					<div><span>Incoming SMS notifications</span><strong id="cellular-sms-notifications">Not checked</strong></div>
-					<div><span>USSD support</span><strong id="cellular-ussd-support">Not checked</strong></div>
 				</div>
 				<div class="cellular-actions">
 					<button class="button button-secondary" id="cellular-messaging-probe" type="button">Check modem capabilities</button>
@@ -162,8 +161,7 @@ export default {
 				const fields = {
 					sms_mode: '#cellular-sms-mode',
 					sms_storage: '#cellular-sms-storage',
-					sms_notifications: '#cellular-sms-notifications',
-					ussd: '#cellular-ussd-support'
+					sms_notifications: '#cellular-sms-notifications'
 				};
 				const states = {
 					supported: 'AT command supported',
@@ -177,10 +175,10 @@ export default {
 					if (node) node.textContent = states[result[field]] || states.unknown;
 				}
 				if (!result.ok) {
-					toast('The AT interface is busy or unsupported; no SMS or USSD was sent.', 'warning');
+					toast('The AT interface is busy or unsupported; no SMS was sent.', 'warning');
 				}
 			} catch {
-				toast('This router does not currently expose SMS/USSD diagnostics.', 'warning');
+				toast('This router does not currently expose SMS diagnostics.', 'warning');
 			} finally {
 				setBusy(capabilityButton, false);
 			}
