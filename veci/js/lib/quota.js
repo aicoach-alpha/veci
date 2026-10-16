@@ -25,6 +25,40 @@ function showBytes(value) {
 
 export function quotaSummary(payload) {
 	if (!payload || payload.schema !== 1 || !Object.hasOwn(PROVIDER_LABELS, payload.provider)) return null;
+	// A native operator adapter reports verified individual buckets using the
+	// same schema version. Never add potentially overlapping entitlements.
+	if (payload.state === 'ok' && payload.source === 'operator') {
+		const receivedAt = typeof payload.fetched_at === 'string' ? Date.parse(payload.fetched_at) : NaN;
+		const ageMs = Date.now() - receivedAt;
+		if (!Number.isFinite(ageMs) || ageMs < -60000 || ageMs > 30 * 60000 ||
+			!Array.isArray(payload.buckets) || payload.buckets.length === 0 || payload.buckets.length > 64) {
+			return { provider: PROVIDER_LABELS[payload.provider], primary: 'Unavailable', detail: 'Verified carrier quota not available', stale: false };
+		}
+		const items = [];
+		for (const bucket of payload.buckets) {
+			if (!bucket || typeof bucket.label !== 'string' || !bucket.label.trim() || bucket.label.length > 100 ||
+				!validBytes(bucket.remaining_bytes) ||
+				(bucket.total_bytes !== undefined &&
+					(!validBytes(bucket.total_bytes) || bucket.total_bytes < bucket.remaining_bytes))) {
+				return { provider: PROVIDER_LABELS[payload.provider], primary: 'Unavailable', detail: 'Invalid operator quota response', stale: false };
+			}
+			items.push({
+				label: bucket.label,
+				remaining: showBytes(bucket.remaining_bytes),
+				...(validBytes(bucket.total_bytes) ? { total: showBytes(bucket.total_bytes) } : {})
+			});
+		}
+		const first = items[0];
+		return {
+			provider: PROVIDER_LABELS[payload.provider],
+			primary: items.length === 1 ? first.remaining : `${items.length} verified packages`,
+			detail: items.length === 1
+				? `${first.label} · ${first.total ? `of ${first.total}` : 'Remaining only'}`
+				: 'Individual package balances are shown separately',
+			buckets: items,
+			stale: false
+		};
+	}
 	if (!STATES.has(payload.state)) return null;
 
 	const provider = PROVIDER_LABELS[payload.provider];
