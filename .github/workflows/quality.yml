@@ -71,6 +71,13 @@ jobs:
             exit 1
           fi
 
+      - name: Retired USSD and operator quota UI contract
+        run: |
+          ! grep -qi 'ussd' veci/js/pages/cellular.js
+          grep -Fq "api.call('veci.quota', 'status'" veci/js/pages/cellular.js
+          grep -Fq "quotaSummary" veci/js/pages/cellular.js
+          grep -Fq "verifyFeed" veci/js/pages/apps.js
+
       - name: Check RPC helper syntax
         run: sh -n files/rpcd-veci
 
