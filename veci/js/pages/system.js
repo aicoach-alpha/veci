@@ -73,6 +73,16 @@ export default {
 				</article>
 			</div>
 
+
+			<article class="panel">
+				<div class="panel-heading">
+					<div><p class="eyebrow">FIRMWARE MANAGEMENT</p><h3>Firmware updates</h3></div>
+					<button id="veci-check-updates" class="button button-secondary" type="button">Check OTA updates</button>
+				</div>
+				<p id="veci-update-status" class="panel-copy" role="status">Checking update support…</p>
+				<p class="panel-copy">Manual upload and flashing require a validated, compatible image and explicit confirmation; this build does not yet enable flashing.</p>
+			</article>
+
 			<article class="panel danger-panel">
 				<div class="panel-heading">
 					<div><p class="eyebrow">POWER</p><h3>Restart router</h3></div>
@@ -104,6 +114,38 @@ export default {
 				toast(error.message || 'Could not save hostname.', 'error');
 			} finally {
 				setBusy(button, false);
+			}
+		});
+
+
+		const updateButton = root.querySelector('#veci-check-updates');
+		const updateStatus = root.querySelector('#veci-update-status');
+		const updateRpc = () => api.call('veci.firmware', 'status', {}, { timeout: 7000 });
+		updateRpc().then(result => {
+			if (result?.schema === 1 && result?.ota_install_enabled === false) {
+				updateStatus.textContent = 'OTA discovery available. Automatic installation and manual flashing are disabled pending verified release support.';
+			} else {
+				updateStatus.textContent = 'Firmware update backend is not ready.';
+			}
+		}).catch(() => { updateStatus.textContent = 'Firmware update backend is not installed.'; });
+		updateButton?.addEventListener('click', async () => {
+			setBusy(updateButton, true, 'Checking…');
+			updateStatus.textContent = 'Checking signed release channel…';
+			try {
+				const result = await api.call('veci.firmware', 'check', {}, { timeout: 18000 });
+				if (result?.ok !== true) throw Error(result?.reason || 'update_check_failed');
+				if (result.state === 'no_release') {
+					updateStatus.textContent = 'No published VeCI firmware update for this channel.';
+				} else if (result.state === 'unverified_release') {
+					updateStatus.textContent = 'Release metadata is not cryptographically verified. Flashing remains disabled.';
+				} else {
+					updateStatus.textContent = 'Firmware update not available.';
+				}
+			} catch (error) {
+				updateStatus.textContent = 'Could not verify available firmware releases.';
+				toast(error.message || 'OTA check failed', 'warning');
+			} finally {
+				setBusy(updateButton, false);
 			}
 		});
 
