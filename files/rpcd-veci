@@ -792,6 +792,8 @@ method_firmware_validate() {
 		printf '{ "ok": false, "error": "validation_metadata_write_failed" }\n'
 		return
 	}
+	# Do not expose a usable apply token for development/unsigned images.
+	if [ "$signature_state" != signed ]; then token=''; fi
 	printf '{ "ok": true, "validated": true, "signature_verified": %s, "board": "%s", "bytes": %s, "sha256": "%s", "apply_token": "%s" }\n' \
 		"$([ "$signature_state" = signed ] && printf true || printf false)" "$board" "$bytes" "$sha" "$token"
 }
@@ -935,7 +937,9 @@ method_firmware_apply() {
 		printf '{ "ok": false, "error": "validation_token_mismatch" }\n'
 		return
 	}
-	if firmware_signature_required && [ "$validation_signature" != "signed" ]; then
+	# Never permit an unsigned image through the VeCI RPC, even on
+	# development firmware. sysupgrade -T alone is not a trust signature.
+	if [ "$validation_signature" != "signed" ] || ! firmware_keys_present; then
 		printf '{ "ok": false, "error": "signed_validation_required" }\n'
 		return
 	fi
