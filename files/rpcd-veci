@@ -240,7 +240,13 @@ app_feed_enabled() {
 	running_build="$(firmware_build_id)"
 	[ -n "$configured_build" ] && [ "$configured_build" = "$running_build" ] || return 1
 	[ -r /etc/apk/repositories.d/veci-apps.list ] || return 1
-	grep -Fq "/feeds/$running_build/" /etc/apk/repositories.d/veci-apps.list
+	grep -Fq "/feeds/$running_build/" /etc/apk/repositories.d/veci-apps.list || return 1
+	# WE5927 requires a successful signed-index verification through veci.apps
+	# before its generic appAction RPC may install any package.
+	if [ "$(cat /tmp/sysinfo/board_name 2>/dev/null || true)" = 'zbtlink,zbt-we5927' ]; then
+		[ "$(uci -q get veci.main.app_feed_verified_build_id 2>/dev/null)" = "$running_build" ] || return 1
+	fi
+	return 0
 }
 
 manifest_packages() {
