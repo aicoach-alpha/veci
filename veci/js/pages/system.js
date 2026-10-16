@@ -101,7 +101,8 @@ export default {
 			</article>
 		`;
 
-		void bindFirmwareUpdates({ api, root, toast, confirm });
+		const nativeFirmwareCheck = () => api.call('veci.firmware', 'check', {}, { timeout: 20000 });
+		void bindFirmwareUpdates({ api, root, toast, confirm, nativeFirmwareCheck });
 
 		const hostnameForm = root.querySelector('#hostname-form');
 		hostnameForm?.addEventListener('submit', async event => {
