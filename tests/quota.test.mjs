@@ -64,3 +64,43 @@ test('non-ready auth states never reveal prior cached numeric totals', () => {
 		assert.doesNotMatch(result.primary, /GiB/);
 	}
 });
+
+test('native XL operator remaining-only quota is shown when evidence is fresh', () => {
+  const result = quotaSummary({
+    schema: 1, provider: 'xl', state: 'ok', source: 'operator',
+    quality: 'remaining_only', fetched_at: new Date().toISOString(),
+    buckets: [{ label: 'XL Internet', remaining_bytes: 1610612736 }]
+  });
+  assert.equal(result.primary, '1.50 GiB');
+  assert.equal(result.buckets.length, 1);
+  assert.equal(Object.hasOwn(result.buckets[0], 'total'), false);
+});
+
+test('separate operator packages are never added into an invented total', () => {
+  const result = quotaSummary({
+    schema: 1, provider: 'xl', state: 'ok', source: 'operator',
+    fetched_at: new Date().toISOString(),
+    buckets: [
+      { label: 'Main', remaining_bytes: 3 * 1024 ** 3 },
+      { label: 'Local', remaining_bytes: 4 * 1024 ** 3 }
+    ]
+  });
+  assert.equal(result.primary, '2 verified packages');
+  assert.equal(result.buckets[0].remaining, '3.00 GiB');
+  assert.equal(result.buckets[1].remaining, '4.00 GiB');
+  assert.doesNotMatch(result.primary, /7\.00/);
+});
+
+test('native operator data fails closed for missing or stale evidence', () => {
+  const x = { schema:1, provider:'xl', state:'ok', source:'operator',
+    fetched_at:new Date().toISOString(), buckets:[{label:'Main',remaining_bytes:100}] };
+  for (const change of [
+    {source:'router_traffic'}, {source:undefined}, {fetched_at:null},
+    {fetched_at:new Date(Date.now() - 3600000).toISOString()},
+    {buckets:[{label:'Main',remaining_bytes:-3}]},
+    {buckets:[{label:'Main',remaining_bytes:100,total_bytes:20}]}
+  ]) {
+    const result = quotaSummary({...x,...change});
+    assert.ok(result === null || result.primary === 'Unavailable');
+  }
+});
