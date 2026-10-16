@@ -53,6 +53,7 @@ export default {
 				(state.deviceApps === null || state.deviceApps.feed_ready === true);
 			const manager = state.catalog.package_manager || 'unknown';
 			const kernelFeedMismatch = Boolean(state.updateStatus.kernel_feed_mismatch);
+			const overlayInsufficient = Number.isFinite(state.deviceApps?.overlay_free_kb) && Number.isFinite(state.deviceApps?.minimum_overlay_kb) && state.deviceApps.overlay_free_kb < state.deviceApps.minimum_overlay_kb;
 
 			root.innerHTML = `
 				<div class="page-intro">
@@ -107,8 +108,10 @@ export default {
 				<div class="notice-card">
 					<strong>${feedEnabled ? 'VeCI app feed is enabled.' : 'VeCI app feed is disabled.'}</strong>
 					<p>${
-						kernelFeedMismatch
-							? 'Kernel ABI mismatch detected. Kernel-dependent apps remain blocked until the exact VeCI-matched feed is configured.'
+						overlayInsufficient
+							? 'Router flash overlay is too small for a safe optional-app install. Rebuild the firmware with the required apps or use external storage if supported.'
+							: kernelFeedMismatch
+								? 'Kernel ABI mismatch detected. Kernel-dependent apps remain blocked until the exact VeCI-matched feed is configured.'
 							: feedEnabled
 								? `Package manager: ${escapeHtml(manager)}. Install actions are restricted to root-owned app manifests on this router.`
 								: 'Install actions stay locked until a compatible signed feed is configured by the firmware profile.'
