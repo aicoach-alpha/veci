@@ -19,11 +19,12 @@
 		"format": "prettier --write \"veci/**/*.{js,css,html,json}\" \"scripts/**/*.js\"",
 		"format:check": "prettier --check \"veci/**/*.{js,css,html,json}\" \"scripts/**/*.js\"",
 		"lint": "eslint veci scripts eslint.config.js",
-		"check": "pnpm format:check && pnpm exec eslint veci scripts eslint.config.js --max-warnings=0 && pnpm build && pnpm test:quota && pnpm test:modem && pnpm test:firmware",
+		"check": "pnpm format:check && pnpm exec eslint veci scripts eslint.config.js --max-warnings=0 && pnpm build && pnpm test:quota && pnpm test:modem && pnpm test:firmware && pnpm test:cellular",
 		"prepare": "git config core.hooksPath .githooks",
 		"test:quota": "node --test tests/quota.test.mjs",
 		"test:modem": "node --test tests/modem-messages.test.mjs",
-		"test:firmware": "node --test tests/firmware-updates.test.mjs"
+		"test:firmware": "node --test tests/firmware-updates.test.mjs",
+		"test:cellular": "node --test tests/cellular-parity.test.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "9.39.1",
