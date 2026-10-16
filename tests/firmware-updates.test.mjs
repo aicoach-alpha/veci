@@ -88,3 +88,18 @@ test('missing firmware service disables actions', async () => {
   assert.equal(f.nodes['fw-check'].disabled, true);
   assert.equal(f.nodes['fw-apply'].hidden, true);
 });
+
+
+test('board-native unsigned release blocks generic firmware download', async () => {
+  const f = fixture({ firmwareRemoteCheck: {
+    ok: true, available: true, compatible: true, update_available: true, sha256: 'a'.repeat(64)
+  } }, true);
+  await bindFirmwareUpdates({
+    ...f,
+    nativeFirmwareCheck: async () => ({ ok: true, state: 'unverified_release' })
+  });
+  await f.nodes['fw-check'].handlers.click();
+  assert.match(f.nodes['fw-ota-status'].textContent, /not verified/);
+  assert.equal(f.nodes['fw-download'].disabled, true);
+  assert.equal(f.calls.some(x => x.method === 'firmwareRemoteCheck'), false);
+});
