@@ -104,3 +104,15 @@ test('native operator data fails closed for missing or stale evidence', () => {
     assert.ok(result === null || result.primary === 'Unavailable');
   }
 });
+
+test('native quota rejects future timestamps and excessive bucket counts', () => {
+  const basic = {
+    schema:1, provider:'xl', state:'ok', source:'operator',
+    fetched_at:new Date().toISOString(),
+    buckets:[{label:'Main',remaining_bytes:1024}]
+  };
+  const future = quotaSummary({...basic,fetched_at:new Date(Date.now()+300000).toISOString()});
+  const excess = quotaSummary({...basic,buckets:Array.from({length:65},(_,i)=>({label:'bucket'+i,remaining_bytes:100}))});
+  assert.equal(future.primary,'Unavailable');
+  assert.equal(excess.primary,'Unavailable');
+});
