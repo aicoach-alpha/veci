@@ -118,3 +118,18 @@ test('board-native no_release state cannot advertise generic OTA updates', async
   assert.equal(f.nodes['fw-download'].disabled, true);
   assert.equal(f.calls.some(x => x.method === 'firmwareRemoteCheck'), false);
 });
+
+
+test('incompatible board firmware never offers OTA download', async () => {
+  const f = fixture({
+    firmwareRemoteCheck: {
+      ok: true, available: true, compatible: false, update_available: true,
+      sha256: 'a'.repeat(64)
+    }
+  }, true);
+  await bindFirmwareUpdates(f);
+  await f.nodes['fw-check'].handlers.click();
+  assert.match(f.nodes['fw-ota-status'].textContent, /not compatible/);
+  assert.equal(f.nodes['fw-download'].disabled, true);
+  assert.equal(f.calls.some(x => x.method === 'firmwareRemoteDownload'), false);
+});
