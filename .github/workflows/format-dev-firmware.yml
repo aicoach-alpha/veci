@@ -8,6 +8,7 @@ on:
       - 'veci/js/pages/system.js'
       - 'veci/js/pages/apps.js'
       - 'veci/js/pages/cellular.js'
+      - 'veci/js/lib/quota.js'
   workflow_dispatch:
 permissions:
   contents: write
@@ -26,11 +27,11 @@ jobs:
         with:
           version: '8.15.9'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec prettier --write veci/js/lib/firmware-updates.js veci/js/pages/system.js veci/js/pages/apps.js veci/js/pages/cellular.js
+      - run: pnpm exec prettier --write veci/js/lib/firmware-updates.js veci/js/pages/system.js veci/js/pages/apps.js veci/js/pages/cellular.js veci/js/lib/quota.js
       - run: git diff --check
       - name: Commit formatting only
         run: |
-          git add veci/js/lib/firmware-updates.js veci/js/pages/system.js veci/js/pages/apps.js veci/js/pages/cellular.js
+          git add veci/js/lib/firmware-updates.js veci/js/pages/system.js veci/js/pages/apps.js veci/js/pages/cellular.js veci/js/lib/quota.js
           if ! git diff --cached --quiet; then
             git -c user.name="veci-ci" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Format guarded VeCI firmware UI"
             git push origin HEAD:dev
