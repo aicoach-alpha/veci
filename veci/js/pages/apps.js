@@ -29,15 +29,17 @@ export default {
 
 	async render({ api, root, toast, confirm }) {
 		const load = async () => {
-			const [capabilities, catalog, updateStatus] = await Promise.all([
+			const [capabilities, catalog, updateStatus, deviceApps] = await Promise.all([
 				api.veci('capabilities').catch(() => ({})),
 				api.veci('apps', {}, { timeout: 10000 }).catch(() => ({ apps: [] })),
-				api.veci('updateStatus', {}, { timeout: 10000 }).catch(() => ({}))
+				api.veci('updateStatus', {}, { timeout: 10000 }).catch(() => ({})),
+				api.call('veci.apps', 'status', {}, { timeout: 10000 }).catch(() => null)
 			]);
 			return {
 				capabilities,
 				catalog,
 				updateStatus,
+				deviceApps,
 				apps: Array.isArray(catalog.apps) && catalog.apps.length ? catalog.apps : fallbackCatalog(capabilities)
 			};
 		};
@@ -46,7 +48,7 @@ export default {
 		let activeModuleCleanup = null;
 
 		const draw = () => {
-			const feedEnabled = Boolean(state.catalog.feed_enabled);
+			const feedEnabled = Boolean(state.catalog.feed_enabled) && (state.deviceApps === null || state.deviceApps.feed_ready === true);
 			const manager = state.catalog.package_manager || 'unknown';
 			const kernelFeedMismatch = Boolean(state.updateStatus.kernel_feed_mismatch);
 
@@ -62,7 +64,7 @@ export default {
 						.map(app => {
 							const enabled = app.enabled !== false;
 							const installed = Boolean(app.installed);
-							const installable = Boolean(app.installable);
+							const installable = Boolean(app.installable) && feedEnabled;
 							const removable = Boolean(app.removable);
 							const status = installed
 								? badge('Installed', 'success')
