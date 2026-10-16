@@ -103,3 +103,18 @@ test('board-native unsigned release blocks generic firmware download', async () 
   assert.equal(f.nodes['fw-download'].disabled, true);
   assert.equal(f.calls.some(x => x.method === 'firmwareRemoteCheck'), false);
 });
+
+
+test('board-native no_release state cannot advertise generic OTA updates', async () => {
+  const f = fixture({ firmwareRemoteCheck: {
+    ok: true, available: true, compatible: true, update_available: true, sha256: 'a'.repeat(64)
+  } }, true);
+  await bindFirmwareUpdates({
+    ...f,
+    nativeFirmwareCheck: async () => ({ ok: true, state: 'no_release' })
+  });
+  await f.nodes['fw-check'].handlers.click();
+  assert.match(f.nodes['fw-ota-status'].textContent, /No OTA/);
+  assert.equal(f.nodes['fw-download'].disabled, true);
+  assert.equal(f.calls.some(x => x.method === 'firmwareRemoteCheck'), false);
+});
