@@ -173,10 +173,12 @@ export default {
 				const model = quotaSummary(result);
 				root.querySelector('#carrier-quota-operator').textContent = model?.provider || operator;
 				root.querySelector('#carrier-quota-value').textContent = model?.primary || 'Unavailable';
-				root.querySelector('#carrier-quota-detail').textContent = model?.detail || 'Authenticated carrier backend is not installed';
+				root.querySelector('#carrier-quota-detail').textContent =
+					model?.detail || 'Authenticated carrier backend is not installed';
 			} catch {
 				root.querySelector('#carrier-quota-value').textContent = 'Unavailable';
-				root.querySelector('#carrier-quota-detail').textContent = 'Authenticated carrier backend is not installed';
+				root.querySelector('#carrier-quota-detail').textContent =
+					'Authenticated carrier backend is not installed';
 			} finally {
 				setBusy(quotaRefresh, false);
 			}
