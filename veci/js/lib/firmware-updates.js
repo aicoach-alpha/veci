@@ -113,12 +113,13 @@ export async function bindFirmwareUpdates({ api, root, toast, confirm, nativeFir
 			ota = null;
 			refresh();
 			// Board-native channel check fails closed on unsigned releases.
-			const native = typeof nativeFirmwareCheck === 'function'
-				? await nativeFirmwareCheck().catch(() => null) : null;
+			const native =
+				typeof nativeFirmwareCheck === 'function' ? await nativeFirmwareCheck().catch(() => null) : null;
 			if (native?.ok === true && ['no_release', 'unverified_release'].includes(native.state)) {
-				otaInfo.textContent = native.state === 'no_release'
-					? 'No OTA firmware release has been published.'
-					: 'OTA release metadata is not verified. Download and flashing blocked.';
+				otaInfo.textContent =
+					native.state === 'no_release'
+						? 'No OTA firmware release has been published.'
+						: 'OTA release metadata is not verified. Download and flashing blocked.';
 				return;
 			}
 			const result = ok(await call('firmwareRemoteCheck', {}, 30000));

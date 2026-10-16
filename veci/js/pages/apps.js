@@ -48,7 +48,9 @@ export default {
 		let activeModuleCleanup = null;
 
 		const draw = () => {
-			const feedEnabled = Boolean(state.catalog.feed_enabled) && (state.deviceApps === null || state.deviceApps.feed_ready === true);
+			const feedEnabled =
+				Boolean(state.catalog.feed_enabled) &&
+				(state.deviceApps === null || state.deviceApps.feed_ready === true);
 			const manager = state.catalog.package_manager || 'unknown';
 			const kernelFeedMismatch = Boolean(state.updateStatus.kernel_feed_mismatch);
 
