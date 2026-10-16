@@ -30,17 +30,38 @@ export function quotaSummary(payload) {
 	if (payload.state === 'ok' && payload.source === 'operator') {
 		const receivedAt = typeof payload.fetched_at === 'string' ? Date.parse(payload.fetched_at) : NaN;
 		const ageMs = Date.now() - receivedAt;
-		if (!Number.isFinite(ageMs) || ageMs < -60000 || ageMs > 30 * 60000 ||
-			!Array.isArray(payload.buckets) || payload.buckets.length === 0 || payload.buckets.length > 64) {
-			return { provider: PROVIDER_LABELS[payload.provider], primary: 'Unavailable', detail: 'Verified carrier quota not available', stale: false };
+		if (
+			!Number.isFinite(ageMs) ||
+			ageMs < -60000 ||
+			ageMs > 30 * 60000 ||
+			!Array.isArray(payload.buckets) ||
+			payload.buckets.length === 0 ||
+			payload.buckets.length > 64
+		) {
+			return {
+				provider: PROVIDER_LABELS[payload.provider],
+				primary: 'Unavailable',
+				detail: 'Verified carrier quota not available',
+				stale: false
+			};
 		}
 		const items = [];
 		for (const bucket of payload.buckets) {
-			if (!bucket || typeof bucket.label !== 'string' || !bucket.label.trim() || bucket.label.length > 100 ||
+			if (
+				!bucket ||
+				typeof bucket.label !== 'string' ||
+				!bucket.label.trim() ||
+				bucket.label.length > 100 ||
 				!validBytes(bucket.remaining_bytes) ||
 				(bucket.total_bytes !== undefined &&
-					(!validBytes(bucket.total_bytes) || bucket.total_bytes < bucket.remaining_bytes))) {
-				return { provider: PROVIDER_LABELS[payload.provider], primary: 'Unavailable', detail: 'Invalid operator quota response', stale: false };
+					(!validBytes(bucket.total_bytes) || bucket.total_bytes < bucket.remaining_bytes))
+			) {
+				return {
+					provider: PROVIDER_LABELS[payload.provider],
+					primary: 'Unavailable',
+					detail: 'Invalid operator quota response',
+					stale: false
+				};
 			}
 			items.push({
 				label: bucket.label,
@@ -52,9 +73,10 @@ export function quotaSummary(payload) {
 		return {
 			provider: PROVIDER_LABELS[payload.provider],
 			primary: items.length === 1 ? first.remaining : `${items.length} verified packages`,
-			detail: items.length === 1
-				? `${first.label} · ${first.total ? `of ${first.total}` : 'Remaining only'}`
-				: 'Individual package balances are shown separately',
+			detail:
+				items.length === 1
+					? `${first.label} · ${first.total ? `of ${first.total}` : 'Remaining only'}`
+					: 'Individual package balances are shown separately',
 			buckets: items,
 			stale: false
 		};
