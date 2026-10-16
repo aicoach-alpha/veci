@@ -119,8 +119,26 @@ export default {
 									? `Package manager: ${escapeHtml(manager)}. Install actions are restricted to root-owned app manifests on this router.`
 									: 'Install actions stay locked until a compatible signed feed is configured by the firmware profile.'
 					}</p>
+					${state.deviceApps?.feed_configured === true && state.deviceApps?.feed_verified !== true ? '<button id="verify-app-feed" class="button button-secondary" type="button">Verify signed App Store feed</button>' : ''}
 				</div>
 			`;
+
+			const verifyFeed = root.querySelector('#verify-app-feed');
+			verifyFeed?.addEventListener('click', async () => {
+				setBusy(verifyFeed, true, 'Verifying repository…');
+				try {
+					const result = await api.call('veci.apps', 'verifyFeed', {}, { timeout: 120000 });
+					if (result?.ok !== true || result?.verified !== true) {
+						throw new Error(result?.reason || 'Repository signature verification failed');
+					}
+					state = await load();
+					draw();
+					toast('The matched signed app repository has been verified.', 'success');
+				} catch (error) {
+					toast(error.message || 'Could not verify signed repository.', 'error');
+					setBusy(verifyFeed, false);
+				}
+			});
 
 			root.querySelectorAll('[data-app-module]').forEach(button => {
 				button.addEventListener('click', async () => {
