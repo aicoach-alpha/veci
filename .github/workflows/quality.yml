@@ -25,6 +25,7 @@ jobs:
       - run: pnpm test:quota
       - run: pnpm test:modem
       - run: pnpm test:firmware
+      - run: pnpm test:cellular
       - run: pnpm build
       - run: node scripts/build-demo.js
 
