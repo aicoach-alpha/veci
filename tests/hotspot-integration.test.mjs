@@ -16,3 +16,13 @@ test('guest client visibility and disconnect require authenticated ACL', () => {
 	assert.ok(acl.veci.read.ubus['veci.app.*'].includes('clients'));
 	assert.ok(acl.veci.write.ubus['veci.app.*'].includes('disconnect'));
 });
+
+test('Hotspot voucher batch is bounded and authorized', () => {
+	const hotspot = read('hotspot.js');
+	const acl = JSON.parse(readFileSync(new URL('../rpcd-acl.json', import.meta.url), 'utf8'));
+	assert.ok(acl.veci.write.ubus['veci.app.*'].includes('createBatch'));
+	assert.match(hotspot, /count\s*<\s*1\s*\|\|\s*count\s*>\s*20/);
+	assert.match(hotspot, /'createBatch'/);
+	assert.match(hotspot, /result\?\.ok !== true/);
+	assert.match(hotspot, /URL\.revokeObjectURL/);
+});

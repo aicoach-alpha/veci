@@ -46,7 +46,7 @@
 					"firmwareApply"
 				],
 				"veci.cellular": ["reconnect", "switchSim"],
-				"veci.app.*": ["save", "action", "create", "revoke", "cleanup", "disconnect"]
+				"veci.app.*": ["save", "action", "create", "createBatch", "revoke", "cleanup", "disconnect"]
 			},
 			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		}
