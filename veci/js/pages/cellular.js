@@ -1,5 +1,4 @@
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
-import { quotaSummary } from '../lib/quota.js';
 
 function metric(label, value, suffix = '') {
 	const display = value === undefined || value === null || value === '' ? '—' : `${value}${suffix}`;
@@ -553,8 +552,6 @@ export default {
 		const sim = status.sim || '—';
 		const model = status.model || status.manufacturer || 'Cellular modem';
 		const operator = normalizeOperator(status.operator);
-		const carrierQuota = await api.call('veci.quota', 'status', {}, { timeout: 4000 }).catch(() => null);
-		const quotaModel = quotaSummary(carrierQuota);
 		const technology = status.access_tech || status.registration_status || 'Unknown';
 
 		// The router's Content-Security-Policy is style-src 'self'.
@@ -630,17 +627,6 @@ export default {
 
 
 				
-			<section class="panel" id="cellular-operator-quota">
-				<div class="panel-heading"><div><p class="eyebrow">INDONESIA · OPERATOR</p><h3>Operator Data Quota</h3></div></div>
-				<div class="detail-list">
-					<div><span>Operator</span><strong id="carrier-quota-operator">${escapeHtml(quotaModel?.provider || operator)}</strong></div>
-					<div><span>Remaining quota / status</span><strong id="carrier-quota-value">${escapeHtml(quotaModel?.primary || 'Unavailable')}</strong></div>
-					<div><span>Information</span><strong id="carrier-quota-detail">${escapeHtml(quotaModel?.detail || 'Authenticated carrier backend is not installed')}</strong></div>
-				</div>
-				<p class="panel-copy">Operator data is not estimated from local traffic counters. No automatic login or refresh is performed.</p>
-				<button class="button button-secondary" id="carrier-quota-status-refresh" type="button">Refresh local quota status</button>
-			</section>
-
 			<section class="panel" aria-labelledby="cellular-sms-mifi-title">
 				<div class="panel-heading">
 					<div><p class="eyebrow">MESSAGING</p><h3 id="cellular-sms-mifi-title">SMS Inbox</h3></div>
@@ -724,25 +710,6 @@ export default {
 					if (value) value.textContent = 'Not verified';
 				});
 		}
-
-		const quotaRefresh = root.querySelector('#carrier-quota-status-refresh');
-		quotaRefresh?.addEventListener('click', async () => {
-			setBusy(quotaRefresh, true, 'Checking…');
-			try {
-				const result = await api.call('veci.quota', 'status', {}, { timeout: 4000 });
-				const model = quotaSummary(result);
-				root.querySelector('#carrier-quota-operator').textContent = model?.provider || operator;
-				root.querySelector('#carrier-quota-value').textContent = model?.primary || 'Unavailable';
-				root.querySelector('#carrier-quota-detail').textContent =
-					model?.detail || 'Authenticated carrier backend is not installed';
-			} catch {
-				root.querySelector('#carrier-quota-value').textContent = 'Unavailable';
-				root.querySelector('#carrier-quota-detail').textContent =
-					'Authenticated carrier backend is not installed';
-			} finally {
-				setBusy(quotaRefresh, false);
-			}
-		});
 
 		// SMS is opt-in by persistent on/off setting. NO modem query on page load.
 		// This uses the SAME authenticated write-only veci.sms ACL already used
