@@ -43,7 +43,7 @@ export default {
         ${voucherInstalled ? '<button class="button button-primary" type="button" data-hotspot-module="voucher">Manage vouchers</button>' : '<a class="button button-secondary" href="#/apps" data-route="apps">Install Voucher app</a>'}
       </section></div>
       ${
-			voucherInstalled
+			voucher?.batch_supported === true
 				? `
       <section class="panel" aria-labelledby="voucher-batch-heading">
         <div class="panel-heading"><div><p class="eyebrow">CAFE VOUCHERS</p><h3 id="voucher-batch-heading">Generate a voucher batch</h3></div></div>
@@ -60,6 +60,7 @@ export default {
       </section>`
 				: ''
 		}
+      ${voucherInstalled && voucher?.batch_supported !== true ? '<p class="panel-copy">Voucher batch requires the newer signed Voucher app package. Existing single-voucher management remains available.</p>' : ''}
       <div class="notice-card"><strong>Guest isolation and access control</strong>
       <p>Guest portal and vouchers use the firmware's supported uspot integration. Provisioning or enabling the guest network can reload Wi-Fi, DHCP and firewall services. Do not activate it without checking access recovery.</p></div>
     `;
