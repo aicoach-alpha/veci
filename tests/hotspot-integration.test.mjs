@@ -10,3 +10,9 @@ test('Hotspot uses native guest and voucher RPC providers', () => {
 	assert.match(hotspot, /\/veci-apps\/voucher\.js/);
 	assert.doesNotMatch(hotspot, /openNDS|voucher CSV|voucher roll/i);
 });
+
+test('guest client visibility and disconnect require authenticated ACL', () => {
+	const acl = JSON.parse(readFileSync(new URL('../rpcd-acl.json', import.meta.url), 'utf8'));
+	assert.ok(acl.veci.read.ubus['veci.app.*'].includes('clients'));
+	assert.ok(acl.veci.write.ubus['veci.app.*'].includes('disconnect'));
+});
