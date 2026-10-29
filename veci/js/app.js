@@ -12,6 +12,7 @@ import systemPage from './pages/system.js';
 import cellularPage from './pages/cellular.js';
 import updatesPage from './pages/updates.js';
 import appsPage from './pages/apps.js';
+import hotspotPage from './pages/hotspot.js';
 
 const pages = [
 	homePage,
@@ -19,6 +20,7 @@ const pages = [
 	wifiPage,
 	devicesPage,
 	cellularPage,
+	hotspotPage,
 	securityPage,
 	networkPage,
 	systemPage,
