@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=veci
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=6
+PKG_RELEASE:=7
 
 PKG_MAINTAINER:=aicoach-alpha
 PKG_LICENSE:=MIT

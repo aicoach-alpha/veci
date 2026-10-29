@@ -298,6 +298,13 @@ method_apps() {
 	app_feed_enabled && feed_enabled=true
 	items=''
 
+    # Bound, read-only resource metrics so UI can explain why the router cannot install apps
+    # even when the optional signed-feed provider does not exist.
+    overlay_free_kb="$(df -Pk /overlay 2>/dev/null | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print $4}')"
+    case "$overlay_free_kb" in ''|*[!0-9]*) overlay_free_kb=null;; esac
+    mem_available_kb="$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo 2>/dev/null)"
+    case "$mem_available_kb" in ''|*[!0-9]*) mem_available_kb=null;; esac
+
 	for manifest in /usr/share/veci/apps/*.json; do
 		[ -r "$manifest" ] || continue
 
@@ -350,7 +357,7 @@ EOF
 		items="${items:+$items, }$item"
 	done
 
-	printf '{ "package_manager": "%s", "feed_enabled": %s, "apps": [ %s ] }\n' "$manager" "$feed_enabled" "$items"
+	printf '{ "package_manager": "%s", "feed_enabled": %s, "overlay_free_kb": %s, "minimum_overlay_kb": 2048, "memory_available_kb": %s, "minimum_mem_available_kb": 8192, "apps": [ %s ] }\n' "$manager" "$feed_enabled" "$overlay_free_kb" "$mem_available_kb" "$items"
 }
 
 method_app_action() {

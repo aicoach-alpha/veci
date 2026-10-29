@@ -65,10 +65,11 @@ export default {
 								? 'The signed feed is not ready or does not match this firmware; check exact build ID, signatures and dependencies.'
 								: null;
 			const kernelFeedMismatch = Boolean(state.updateStatus.kernel_feed_mismatch);
+			const resources = Number.isFinite(state.deviceApps?.overlay_free_kb) ? state.deviceApps : state.catalog;
 			const overlayInsufficient =
-				Number.isFinite(state.deviceApps?.overlay_free_kb) &&
-				Number.isFinite(state.deviceApps?.minimum_overlay_kb) &&
-				state.deviceApps.overlay_free_kb < state.deviceApps.minimum_overlay_kb;
+				Number.isFinite(resources?.overlay_free_kb) &&
+				Number.isFinite(resources?.minimum_overlay_kb) &&
+				resources.overlay_free_kb < resources.minimum_overlay_kb;
 
 			root.innerHTML = `
 				<div class="page-intro">
@@ -124,7 +125,7 @@ export default {
 					<strong>${feedEnabled ? 'VeCI signed app feed is verified and ready.' : 'VeCI signed app installation is blocked.'}</strong>
 					<p>${
 						overlayInsufficient
-							? 'Router flash overlay is too small for a safe optional-app install. Rebuild the firmware with the required apps or use external storage if supported.'
+							? `Only ${resources.overlay_free_kb} KB overlay available; minimum ${resources.minimum_overlay_kb} KB required for even attempting optional-app installation. Use a verified firmware image bundling required apps or supported extroot; never force APKs.`
 							: kernelFeedMismatch
 								? 'Kernel ABI mismatch detected. Kernel-dependent apps remain blocked until the exact VeCI-matched feed is configured.'
 								: feedEnabled

@@ -81,3 +81,16 @@ test('Router Apps refuses optimistic install if signed-feed provider is missing'
 	assert.match(ui, /guest: \['Guest portal'/);
 	assert.doesNotMatch(ui, /opennds: \['Guest portal'/);
 });
+
+test('Core app catalog returns bounded overlay and memory metrics when feed provider is missing', () => {
+	const core = readFileSync(new URL('../files/rpcd-veci', import.meta.url), 'utf8');
+	const ui = readFileSync(new URL('../veci/js/pages/apps.js', import.meta.url), 'utf8');
+	const section = core.split('method_apps() {')[1].split('\nmethod_app_action() {')[0];
+	for (const field of ['overlay_free_kb', 'minimum_overlay_kb', 'memory_available_kb', 'minimum_mem_available_kb'])
+		assert.match(section, new RegExp(field));
+	assert.match(core, /overlay_free_kb=null/);
+	assert.match(core, /mem_available_kb=null/);
+	assert.match(ui, /Number\.isFinite\(state\.deviceApps\?\.overlay_free_kb\) \? state\.deviceApps : state\.catalog/);
+	assert.match(ui, /resources\.overlay_free_kb/);
+	assert.match(ui, /resources\.minimum_overlay_kb/);
+});
