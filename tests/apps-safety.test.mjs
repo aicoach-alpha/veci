@@ -42,3 +42,26 @@ test('cannot remove guest portal while voucher application depends on it', () =>
 	assert.match(script, /voucher_depends_on_guest/);
 	assert.match(script, /package_installed veci-app-voucher/);
 });
+
+test('APK simulation parser protects core packages without blocking optional apps', () => {
+	const func = script.match(/app_removal_has_core_packages\(\) \{[\s\S]*?\n\}/)?.[0];
+	assert.ok(func, 'missing core package parser');
+	for (const [pkg, blocked] of [
+		['veci-app-voucher', false],
+		['veci-app-guest', false],
+		['veci-app-sqm', false],
+		['uspot', false],
+		['veci', true],
+		['veci-default-ui', true],
+		['rpcd', true],
+		['dnsmasq-full', true],
+		['kernel-6.12.94', true],
+		['kmod-usb-core', true]
+	]) {
+		const result = spawnSync('sh', ['-c', func + '\napp_removal_has_core_packages /dev/stdin'], {
+			input: '(1/1) Purging ' + pkg + ' (1-r1)\nOK: 21 MiB in 80 packages\n',
+			encoding: 'utf8'
+		});
+		assert.equal(result.status, blocked ? 0 : 1, pkg + ' ' + result.stderr);
+	}
+});

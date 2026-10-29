@@ -277,6 +277,21 @@ safe_package_words() {
   return 0
 }
 
+
+# Parse exact package tokens from APK v3 simulated removal output.
+# Do not match 'veci-app-*' when protecting the core 'veci' package.
+app_removal_has_core_packages() {
+    awk '
+        /^[[:space:]]*\([0-9]+\/[0-9]+\)[[:space:]]+(Purging|Removing)[[:space:]]+/ {
+            pkg=$3
+            if (pkg == "veci" ||
+                pkg ~ /^kmod-/ || pkg ~ /^(kernel|base-files|busybox|libc|libubox|libubus|libuci|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci-default-ui|veci-cellular-we5927|veci-update-we5927)(-|$)/)
+                blocked=1
+        }
+        END {exit(blocked ? 0 : 1)}
+    ' "$1"
+}
+
 method_apps() {
 	manager=$(package_manager)
 	feed_enabled=false
@@ -412,7 +427,7 @@ EOF
             printf '{ "ok": false, "error": "app_removal_preflight_failed" }\n'
             return
         fi
-        if grep -Eiq '(purging|removing) (kernel|kmod-|base-files|busybox|libc|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci)' /tmp/veci-app-preflight.log; then
+        if app_removal_has_core_packages /tmp/veci-app-preflight.log; then
             printf '{ "ok": false, "error": "core_dependency_protected" }\n'
             return
         fi
