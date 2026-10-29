@@ -3,24 +3,14 @@
 		"description": "VeCI OpenWrt administration access",
 		"read": {
 			"ubus": {
-				"system": [
-					"board",
-					"info"
-				],
-				"network.interface": [
-					"dump"
-				],
-				"network.interface.*": [
-					"status"
-				],
-				"network.wireless": [
-					"status"
-				],
-				"uci": [
-					"get"
-				],
+				"system": ["board", "info"],
+				"network.interface": ["dump"],
+				"network.interface.*": ["status"],
+				"network.wireless": ["status"],
+				"uci": ["get"],
 				"veci": [
 					"capabilities",
+					"hotspotStatus",
 					"clients",
 					"networkInventory",
 					"health",
@@ -32,37 +22,16 @@
 					"firmwareStatus",
 					"firmwareRemoteCheck"
 				],
-				"veci.cellular": [
-					"status"
-				],
-				"veci.app.*": [
-					"status"
-				]
+				"veci.cellular": ["status"],
+				"veci.app.*": ["status"]
 			},
-			"uci": [
-				"network",
-				"wireless",
-				"firewall",
-				"dhcp",
-				"system",
-				"veci"
-			]
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		},
 		"write": {
 			"ubus": {
-				"system": [
-					"reboot"
-				],
-				"network.interface.*": [
-					"up",
-					"down"
-				],
-				"uci": [
-					"set",
-					"add",
-					"delete",
-					"commit"
-				],
+				"system": ["reboot"],
+				"network.interface.*": ["up", "down"],
+				"uci": ["set", "add", "delete", "commit"],
 				"veci": [
 					"appAction",
 					"serviceAction",
@@ -76,26 +45,10 @@
 					"firmwarePolicySave",
 					"firmwareApply"
 				],
-				"veci.cellular": [
-					"reconnect",
-					"switchSim"
-				],
-				"veci.app.*": [
-					"save",
-					"action",
-					"create",
-					"revoke",
-					"cleanup"
-				]
+				"veci.cellular": ["reconnect", "switchSim"],
+				"veci.app.*": ["save", "action", "create", "revoke", "cleanup"]
 			},
-			"uci": [
-				"network",
-				"wireless",
-				"firewall",
-				"dhcp",
-				"system",
-				"veci"
-			]
+			"uci": ["network", "wireless", "firewall", "dhcp", "system", "veci"]
 		}
 	}
 }
