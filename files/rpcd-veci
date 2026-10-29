@@ -35,22 +35,6 @@ method_capabilities() {
 		"$opennds" "$sqm" "$ddns" "$wireguard" "$voucher" "$cellular"
 }
 
-method_hotspot_status() {
-  installed=false
-  running=false
-  theme_configured=false
-  [ -r /etc/config/opennds ] && installed=true
-  if command -v pidof >/dev/null 2>&1 && pidof opennds >/dev/null 2>&1; then
-    running=true
-  fi
-  if command -v uci >/dev/null 2>&1; then
-    theme="$(uci -q get 'opennds.@opennds[0].themespec_path' 2>/dev/null || true)"
-    mode="$(uci -q get 'opennds.@opennds[0].login_option_enabled' 2>/dev/null || true)"
-    case "$theme:$mode" in *voucher*:3) theme_configured=true;; esac
-  fi
-  printf '{ "installed": %s, "running": %s, "voucher_theme_configured": %s }\n' "$installed" "$running" "$theme_configured"
-}
-
 method_clients() {
 	now=$(date +%s)
 	items=''
@@ -286,7 +270,7 @@ safe_package_words() {
   [ "$#" -gt 0 ] || return 1
   for package in "$@"; do
     case "$package" in
-      ''|[!A-Za-z0-9]*|*[!A-Za-z0-9+_.-]*|kernel|kernel-*|kmod-*|base-files|busybox|libc|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci|veci-*)
+      ''|[!A-Za-z0-9]*|*[!A-Za-z0-9+_.-]*|kernel|kernel-*|kmod-*|base-files|busybox|libc|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci|veci-default-ui|veci-cellular-we5927|veci-update-we5927)
         return 1 ;;
     esac
   done
@@ -419,6 +403,10 @@ EOF
 	}
 
 	rc=1
+    if [ "$action" = "remove" ] && [ "$id" = guest ] && package_installed veci-app-voucher; then
+        printf '{ "ok": false, "error": "voucher_depends_on_guest" }\n'
+        return
+    fi
 	if [ "$action" = "remove" ]; then
         if [ "$manager" != apk ] || ! apk --simulate del "$@" >/tmp/veci-app-preflight.log 2>&1; then
             printf '{ "ok": false, "error": "app_removal_preflight_failed" }\n'
@@ -1144,12 +1132,11 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "hotspotStatus": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
 			capabilities) method_capabilities ;;
-			hotspotStatus) method_hotspot_status ;;
 			clients) method_clients ;;
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;

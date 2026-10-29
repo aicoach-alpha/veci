@@ -10,7 +10,6 @@
 				"uci": ["get"],
 				"veci": [
 					"capabilities",
-					"hotspotStatus",
 					"clients",
 					"networkInventory",
 					"health",

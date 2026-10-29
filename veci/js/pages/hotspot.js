@@ -1,64 +1,73 @@
 import { badge, escapeHtml } from '../lib/dom.js';
-import { generateVoucherCsv } from '../lib/voucher.js';
+
+const modules = {
+	guest: { path: '/veci-apps/guest.js', name: 'Guest portal' },
+	voucher: { path: '/veci-apps/voucher.js', name: 'Voucher' }
+};
+
 export default {
 	id: 'hotspot',
 	title: 'Hotspot',
 	eyebrow: 'GUEST ACCESS',
 	icon: 'wifi',
-	async render({ api, root, toast }) {
-		const capability = await api.veci('capabilities').catch(() => ({}));
-		const service = await api.veci('hotspotStatus').catch(() => null);
-		const ndsInstalled = Boolean(service?.installed ?? capability.opennds);
-		const active = service?.running === true;
-		root.innerHTML = `<div class="page-intro"><div><h2>Hotspot & vouchers</h2>
-      <p>Guest captive portal based on openNDS. Generate a voucher roll compatible with openNDS ThemeSpec.</p></div>
-      ${badge(ndsInstalled ? (active ? 'Portal running' : 'Installed, not running') : 'Portal not installed', active ? 'success' : 'neutral')}</div>
+	async render({ api, root, toast, confirm }) {
+		const [guest, voucher] = await Promise.all([
+			api.call('veci.app.guest', 'status', {}).catch(() => null),
+			api.call('veci.app.voucher', 'status', {}).catch(() => null)
+		]);
+		const guestInstalled = guest !== null;
+		const voucherInstalled = voucher !== null;
+		const count = Array.isArray(voucher?.vouchers) ? voucher.vouchers.length : 0;
+		root.innerHTML = `
+      <div class="page-intro"><div><h2>Hotspot & vouchers</h2>
+      <p>Manage a dedicated guest network and time-limited credentials using the native VeCI guest and voucher apps.</p></div>
+      ${badge(guest?.enabled ? 'Guest portal active' : 'Guest portal inactive', guest?.enabled ? 'success' : 'neutral')}</div>
+      <div class="content-grid content-grid-2">
       <section class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">PORTAL</p><h3>Integration status</h3></div></div>
-        <div class="detail-list"><div><span>openNDS</span><strong>${ndsInstalled ? 'Installed' : 'Not installed'}</strong></div>
-        <div><span>Service</span><strong>${active ? 'Running' : 'Not running / not verified'}</strong></div>
-        <div><span>Voucher provider</span><strong>${capability.voucher ? 'Exposed' : 'Not available'}</strong></div></div>
-        <p class="panel-copy">Voucher CSV export does not activate accounts. Install and configure the verified openNDS voucher ThemeSpec and import the roll before customers can log in.</p>
+        <div class="panel-heading"><div><p class="eyebrow">GUEST NETWORK</p><h3>Captive portal</h3></div>
+        ${badge(guestInstalled ? 'Installed' : 'Not installed', guestInstalled ? 'success' : 'neutral')}</div>
+        <div class="detail-list">
+          <div><span>Network</span><strong>${escapeHtml(guest?.ssid || 'Not configured')}</strong></div>
+          <div><span>Portal</span><strong>${guest?.enabled ? 'Enabled' : 'Disabled'}</strong></div>
+          <div><span>Authentication</span><strong>${guest?.auth_mode === 'credentials' ? 'Voucher credentials' : 'Click to continue / unavailable'}</strong></div>
+        </div>
+        ${guestInstalled ? '<button class="button button-primary" type="button" data-hotspot-module="guest">Manage guest portal</button>' : '<a class="button button-secondary" href="#/apps" data-route="apps">Install Guest app</a>'}
       </section>
       <section class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">VOUCHER ROLL</p><h3>Generate secure access codes</h3></div></div>
-        <form id="voucher-generator" class="diagnostic-form">
-          <label class="field"><span>Count (1–100)</span><input name="count" type="number" min="1" max="100" value="10" required /></label>
-          <label class="field"><span>Duration (minutes)</span><input name="minutes" type="number" min="1" max="43200" value="60" required /></label>
-          <label class="field"><span>Download rate (kb/s, 0 = unlimited)</span><input name="downloadKbps" type="number" min="0" max="100000" value="2000" required /></label>
-          <label class="field"><span>Upload rate (kb/s, 0 = unlimited)</span><input name="uploadKbps" type="number" min="0" max="100000" value="1000" required /></label>
-          <label class="field"><span>Download quota (MiB, 0 = unlimited)</span><input name="downloadMiB" type="number" min="0" max="102400" value="0" required /></label>
-          <label class="field"><span>Upload quota (MiB, 0 = unlimited)</span><input name="uploadMiB" type="number" min="0" max="102400" value="0" required /></label>
-          <button class="button button-primary" type="submit">Export voucher CSV</button>
-        </form>
-        <p class="panel-copy">Codes are generated locally using cryptographically secure random bytes. The file is private: it contains unused voucher credentials. Store it securely, and do not keep an active voucher roll on flash where every login rewrites it.</p>
-      </section>`;
-		root.querySelector('#voucher-generator').addEventListener('submit', event => {
-			event.preventDefault();
-			const form = event.currentTarget;
-			const data = new FormData(form);
-			try {
-				const n = key => Number(data.get(key));
-				const csv = generateVoucherCsv({
-					count: n('count'),
-					minutes: n('minutes'),
-					downloadKbps: n('downloadKbps'),
-					uploadKbps: n('uploadKbps'),
-					downloadKiB: n('downloadMiB') * 1024,
-					uploadKiB: n('uploadMiB') * 1024
-				});
-				const href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-				const link = document.createElement('a');
-				link.href = href;
-				link.download = 'veci-vouchers.csv';
-				document.body.appendChild(link);
-				link.click();
-				link.remove();
-				setTimeout(() => URL.revokeObjectURL(href), 5000);
-				toast('Voucher roll exported. Import to a configured openNDS portal before use.', 'success');
-			} catch (error) {
-				toast(escapeHtml(error.message || 'Voucher generation failed'), 'error');
-			}
+        <div class="panel-heading"><div><p class="eyebrow">VOUCHERS</p><h3>Guest credentials</h3></div>
+        ${badge(voucherInstalled ? 'Installed' : 'Not installed', voucherInstalled ? 'success' : 'neutral')}</div>
+        <div class="detail-list">
+          <div><span>Active vouchers</span><strong>${count}</strong></div>
+          <div><span>Guest ready</span><strong>${voucher?.guest_ready ? 'Yes' : 'No'}</strong></div>
+        </div>
+        ${voucherInstalled ? '<button class="button button-primary" type="button" data-hotspot-module="voucher">Manage vouchers</button>' : '<a class="button button-secondary" href="#/apps" data-route="apps">Install Voucher app</a>'}
+      </section></div>
+      <div class="notice-card"><strong>Guest isolation and access control</strong>
+      <p>Guest portal and vouchers use the firmware's supported uspot integration. Provisioning or enabling the guest network can reload Wi-Fi, DHCP and firewall services. Do not activate it without checking access recovery.</p></div>
+    `;
+		root.querySelectorAll('[data-hotspot-module]').forEach(button => {
+			button.addEventListener('click', async () => {
+				const key = button.dataset.hotspotModule;
+				const moduleInfo = modules[key];
+				if (!moduleInfo) return;
+				button.disabled = true;
+				try {
+					const imported = await import(moduleInfo.path);
+					if (typeof imported.default?.render !== 'function') throw new Error('App module unavailable');
+					root.innerHTML = '';
+					await imported.default.render({
+						api,
+						root,
+						toast,
+						confirm,
+						app: { name: moduleInfo.name },
+						back: () => this.render({ api, root, toast, confirm })
+					});
+				} catch (error) {
+					toast(error.message || 'Unable to open hotspot module', 'error');
+					this.render({ api, root, toast, confirm });
+				}
+			});
 		});
 	}
 };

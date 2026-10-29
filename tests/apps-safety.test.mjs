@@ -30,9 +30,15 @@ test('package allowlist blocks option injection, paths and core packages at runt
 		['--force', 1],
 		['kmod-usb-core', 1],
 		['a/b', 1],
-		['base-files', 1]
+		['base-files', 1],
+		['veci-app-voucher', 0]
 	]) {
 		const rc = spawnSync('sh', ['-c', func + '\n' + 'safe_package_words "$1"', 'sh', candidate]).status;
 		assert.equal(rc, expected, candidate);
 	}
+});
+
+test('cannot remove guest portal while voucher application depends on it', () => {
+	assert.match(script, /voucher_depends_on_guest/);
+	assert.match(script, /package_installed veci-app-voucher/);
 });
