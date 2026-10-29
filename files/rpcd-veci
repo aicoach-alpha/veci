@@ -257,11 +257,24 @@ manifest_remove_packages() {
 	jsonfilter -i "$1" -e '@.remove_packages[*]' 2>/dev/null
 }
 
+app_resources_ok() {
+  free_kb="$(df -Pk /overlay 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ {print $4}')"
+  case "$free_kb" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$free_kb" -ge 2048 ] 2>/dev/null || return 1
+  mem_kb="$(awk '/^MemAvailable:/ {print $2; exit}' /proc/meminfo 2>/dev/null)"
+  case "$mem_kb" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$mem_kb" -ge 8192 ] 2>/dev/null
+}
+
 safe_package_words() {
-	for package in "$@"; do
-		safe=$(clean_token "$package")
-		[ -n "$package" ] && [ "$safe" = "$package" ] || return 1
-	done
+  [ "$#" -gt 0 ] || return 1
+  for package in "$@"; do
+    case "$package" in
+      ''|[!A-Za-z0-9]*|*[!A-Za-z0-9+_.-]*|kernel|kernel-*|kmod-*|base-files|busybox|libc|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci|veci-*)
+        return 1 ;;
+    esac
+  done
+  return 0
 }
 
 method_apps() {
@@ -310,7 +323,7 @@ EOF
 		[ -n "$(manifest_remove_packages "$manifest")" ] && removable=true
 
 		installable=false
-		if [ "$enabled" = true ] && [ "$installed" = false ] && [ "$feed_enabled" = true ] && [ "$manager" != "none" ]; then
+		if [ "$enabled" = true ] && [ "$installed" = false ] && [ "$feed_enabled" = true ] && [ "$manager" = "apk" ] && app_resources_ok; then
 			installable=true
 		fi
 
@@ -357,6 +370,10 @@ method_app_action() {
 				printf '{ "ok": false, "error": "app_feed_disabled" }\n'
 				return
 			}
+            [ "$manager" = apk ] && app_resources_ok || {
+                printf '{ "ok": false, "error": "insufficient_router_resources" }\n'
+                return
+            }
 			package_lines=$(manifest_packages "$manifest")
 			;;
 		remove)
@@ -387,6 +404,14 @@ EOF
 
 	rc=1
 	if [ "$action" = "remove" ]; then
+        if [ "$manager" != apk ] || ! apk --simulate del "$@" >/tmp/veci-app-preflight.log 2>&1; then
+            printf '{ "ok": false, "error": "app_removal_preflight_failed" }\n'
+            return
+        fi
+        if grep -Eiq '(purging|removing) (kernel|kmod-|base-files|busybox|libc|procd|rpcd|netifd|uhttpd|firewall4|nftables|dnsmasq|apk-tools|fstools|veci)' /tmp/veci-app-preflight.log; then
+            printf '{ "ok": false, "error": "core_dependency_protected" }\n'
+            return
+        fi
 		provider="veci.app.$id"
 		# Never remove a package until its cleanup provider explicitly
 		# acknowledges success. A missing/busy rpcd provider is not success.
@@ -412,6 +437,10 @@ EOF
 				printf '{ "ok": false, "error": "app_feed_repositories_missing" }\n'
 				return
 			}
+            if ! apk --simulate add --repositories-file "$repositories" "$@" >/tmp/veci-app-preflight.log 2>&1; then
+                printf '{ "ok": false, "error": "app_dependency_preflight_failed" }\n'
+                return
+            fi
 			apk -U add --repositories-file "$repositories" "$@" >/tmp/veci-app-action.log 2>&1
 			rc=$?
 			;;
