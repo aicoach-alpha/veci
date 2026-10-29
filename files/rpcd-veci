@@ -1011,6 +1011,35 @@ method_firmware_apply() {
 }
 
 
+method_logs() {
+    input="$(cat)"
+    source="$(printf '%s' "$input" | jsonfilter -e '@.source' 2>/dev/null)"
+    limit="$(printf '%s' "$input" | jsonfilter -e '@.limit' 2>/dev/null)"
+    case "$source" in system|kernel) ;; *) source=system ;; esac
+    case "$limit" in ''|*[!0-9]*) limit=100 ;; esac
+    [ "$limit" -gt 150 ] 2>/dev/null && limit=150
+    [ "$limit" -lt 20 ] 2>/dev/null && limit=20
+    # Bound each line and final payload before shell command substitution.
+    # No files are written, and the service never runs on page load.
+    if [ "$source" = kernel ]; then
+        if command -v dmesg >/dev/null 2>&1; then
+            output="$(dmesg 2>/dev/null | tail -n "$limit" | cut -c1-240 | tail -c 16000)"
+        else
+            output='Kernel logs unavailable'
+        fi
+    elif command -v logread >/dev/null 2>&1; then
+        output="$(logread 2>/dev/null | tail -n "$limit" | cut -c1-240 | tail -c 16000)"
+    else
+        output='System logs unavailable'
+    fi
+    . /usr/share/libubox/jshn.sh
+    json_init
+    json_add_string source "$source"
+    json_add_int limit "$limit"
+    json_add_string output "$output"
+    json_dump
+}
+
 method_diagnostic() {
 	input=$(cat)
 	tool=$(printf '%s' "$input" | jsonfilter -e '@.tool' 2>/dev/null)
@@ -1147,7 +1176,7 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
@@ -1170,6 +1199,7 @@ case "$1" in
 			firmwareApply) method_firmware_apply ;;
 			securityStatus) method_security_status ;;
 			setAdminPassword) method_set_admin_password ;;
+			logs) method_logs ;;
 			diagnostic) method_diagnostic ;;
 			serviceAction) method_service_action ;;
 			wifiReload) method_wifi_reload ;;

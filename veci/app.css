@@ -2159,3 +2159,30 @@ a {
 		display: none;
 	}
 }
+
+/* Opt-in bounded system and kernel log viewer */
+.system-log-panel {
+	margin-top: 18px;
+}
+.log-controls {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.system-log-output {
+	max-height: 360px;
+	padding: 16px;
+	overflow: auto;
+	border: 1px solid rgba(148, 163, 184, 0.18);
+	border-radius: 14px;
+	background: #071421;
+	color: #dbeafe;
+	font:
+		11px/1.6 ui-monospace,
+		SFMono-Regular,
+		Menlo,
+		Consolas,
+		monospace;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}

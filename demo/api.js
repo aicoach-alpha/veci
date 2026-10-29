@@ -93,9 +93,22 @@ const state = {
 	},
 	uci: {
 		network: {
-			lan: { '.type': 'interface', proto: 'static', device: 'br-lan', ipaddr: '192.168.1.1', netmask: '255.255.255.0' },
+			lan: {
+				'.type': 'interface',
+				proto: 'static',
+				device: 'br-lan',
+				ipaddr: '192.168.1.1',
+				netmask: '255.255.255.0'
+			},
 			wan: { '.type': 'interface', proto: 'dhcp', device: 'eth0.2', peerdns: '1' },
-			lte: { '.type': 'interface', proto: 'dhcp', device: 'usb0', metric: '5', peerdns: '0', dns: ['94.140.14.14', '94.140.15.15'] }
+			lte: {
+				'.type': 'interface',
+				proto: 'dhcp',
+				device: 'usb0',
+				metric: '5',
+				peerdns: '0',
+				dns: ['94.140.14.14', '94.140.15.15']
+			}
 		},
 		wireless: {
 			radio0: {
@@ -252,9 +265,12 @@ export class VeciApi {
 		}
 		if (object === 'network.wireless' && method === 'status') return this.wirelessStatus();
 		if (object === 'uci' && method === 'get') return this.uciGet(params.config, params.section || null);
-		if (object === 'uci' && method === 'set') return this.uciSet(params.config, params.section, params.values || {});
-		if (object === 'uci' && method === 'add') return this.uciAdd(params.config, params.type, params.values || {}, params.name || null);
-		if (object === 'uci' && method === 'delete') return this.uciDelete(params.config, params.section, params.option || null);
+		if (object === 'uci' && method === 'set')
+			return this.uciSet(params.config, params.section, params.values || {});
+		if (object === 'uci' && method === 'add')
+			return this.uciAdd(params.config, params.type, params.values || {}, params.name || null);
+		if (object === 'uci' && method === 'delete')
+			return this.uciDelete(params.config, params.section, params.option || null);
 		if (object === 'uci' && method === 'commit') return this.uciCommit(params.config);
 		if (object === 'veci.cellular') return this.cellularAction(method, params);
 		if (object === 'veci') return this.veci(method, params);
@@ -365,12 +381,33 @@ export class VeciApi {
 			state.rootPasswordSet = true;
 			return { ok: true, demo: true };
 		}
+		if (method === 'logs') {
+			const source = params.source === 'kernel' ? 'kernel' : 'system';
+			return {
+				source,
+				limit: Math.min(150, Math.max(20, Number(params.limit) || 100)),
+				output:
+					source === 'kernel'
+						? '[   0.000000] Linux version 6.12.94 (demo)\\n[   5.210000] eth0: link up'
+						: 'Oct 29 12:00:00 demo user.notice VeCI: demo router ready\\nOct 29 12:00:03 demo daemon.info netifd: Interface lte is up'
+			};
+		}
 		if (method === 'diagnostic') {
 			const target = params.target || '1.1.1.1';
 			if (params.tool === 'traceroute') {
-				return { ok: true, tool: 'traceroute', target, output: `traceroute to ${target} (simulated)\n 1  192.168.1.1  0.8 ms\n 2  192.168.7.1  4.2 ms\n 3  10.20.0.1  11.6 ms\n 4  ${target}  22.4 ms` };
+				return {
+					ok: true,
+					tool: 'traceroute',
+					target,
+					output: `traceroute to ${target} (simulated)\n 1  192.168.1.1  0.8 ms\n 2  192.168.7.1  4.2 ms\n 3  10.20.0.1  11.6 ms\n 4  ${target}  22.4 ms`
+				};
 			}
-			return { ok: true, tool: 'ping', target, output: `PING ${target} (simulated)\n64 bytes from ${target}: seq=0 ttl=56 time=21.8 ms\n64 bytes from ${target}: seq=1 ttl=56 time=22.1 ms\n64 bytes from ${target}: seq=2 ttl=56 time=21.5 ms\n64 bytes from ${target}: seq=3 ttl=56 time=22.0 ms\n\n4 packets transmitted, 4 received, 0% packet loss` };
+			return {
+				ok: true,
+				tool: 'ping',
+				target,
+				output: `PING ${target} (simulated)\n64 bytes from ${target}: seq=0 ttl=56 time=21.8 ms\n64 bytes from ${target}: seq=1 ttl=56 time=22.1 ms\n64 bytes from ${target}: seq=2 ttl=56 time=21.5 ms\n64 bytes from ${target}: seq=3 ttl=56 time=22.0 ms\n\n4 packets transmitted, 4 received, 0% packet loss`
+			};
 		}
 		const responses = {
 			capabilities: {

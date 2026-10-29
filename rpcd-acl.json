@@ -17,6 +17,7 @@
 					"updateStatus",
 					"apps",
 					"securityStatus",
+					"logs",
 					"diagnostic",
 					"firmwareStatus",
 					"firmwareRemoteCheck"

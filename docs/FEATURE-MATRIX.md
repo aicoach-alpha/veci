@@ -27,7 +27,7 @@ Until a row reaches **Native**, the firmware keeps LuCI available through **Expe
 | Backup / restore / reset | **Expert** | — | Backup archive, restore, factory reset |
 | Packages | **Expert** | App capability view only | Full apk/opkg package management |
 | Services / startup | **Expert** | Narrow allow-listed reload actions used internally | General service enable/disable/startup editor |
-| System / kernel logs | **Expert** | — | Full log viewer |
+| System / kernel logs | **Native read** | On-demand system/kernel log viewer, at most 150 recent lines and 16 KB response | Advanced filtering/export remains Expert |
 | Administrator password | **Native** | First-boot blank-password warning and root password creation without browser persistence | Password rotation and SSH key management remain Expert |
 | SSH keys / administration | **Expert** | — | SSH key and advanced administration |
 | Voucher hotspot | **In development** | Generic VeCI contract and UI planned | Current firmware voucher implementation remains staged until live gates pass |

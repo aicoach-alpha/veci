@@ -92,6 +92,19 @@ export default {
 				</div>
 			</article>
 
+            <article class="panel system-log-panel">
+                <div class="panel-heading">
+                    <div><p class="eyebrow">LOGS</p><h3>Router events</h3></div>
+                    <div class="log-controls">
+                        <button class="button button-compact button-secondary" data-log-source="system" type="button" aria-pressed="true">System</button>
+                        <button class="button button-compact button-secondary" data-log-source="kernel" type="button" aria-pressed="false">Kernel</button>
+                        <button class="button button-compact button-primary" id="refresh-logs" type="button">Load logs</button>
+                    </div>
+                </div>
+                <pre id="system-log-output" class="system-log-output" role="log" aria-live="polite">Logs are not loaded. Select a source and click Load logs.</pre>
+                <p class="panel-copy">On-demand diagnostic data: at most 150 recent lines, 240 characters per line, and 16 KB per response. No automatic polling.</p>
+            </article>
+
 			<article class="panel danger-panel">
 				<div class="panel-heading">
 					<div><p class="eyebrow">POWER</p><h3>Restart router</h3></div>
@@ -100,6 +113,38 @@ export default {
 				<p class="panel-copy">The router will disconnect clients temporarily while OpenWrt restarts.</p>
 			</article>
 		`;
+
+		const logOutput = root.querySelector('#system-log-output');
+		const logButtons = [...root.querySelectorAll('[data-log-source]')];
+		const refreshLogs = root.querySelector('#refresh-logs');
+		let selectedLogSource = 'system';
+		let logLoading = false;
+		const loadLogs = async () => {
+			if (logLoading) return;
+			logLoading = true;
+			setBusy(refreshLogs, true, 'Loading…');
+			try {
+				const result = await api.veci('logs', { source: selectedLogSource, limit: 100 });
+				logOutput.textContent = result.output || 'No log entries returned.';
+			} catch (error) {
+				logOutput.textContent = 'Logs could not be loaded.';
+				toast(error.message || 'Could not read router logs', 'error');
+			} finally {
+				logLoading = false;
+				setBusy(refreshLogs, false);
+			}
+		};
+		logButtons.forEach(button =>
+			button.addEventListener('click', () => {
+				selectedLogSource = button.dataset.logSource === 'kernel' ? 'kernel' : 'system';
+				logButtons.forEach(choice =>
+					choice.setAttribute('aria-pressed', String(choice.dataset.logSource === selectedLogSource))
+				);
+				logOutput.textContent = 'Source changed. Click Load logs.';
+				refreshLogs.textContent = 'Load logs';
+			})
+		);
+		refreshLogs.addEventListener('click', loadLogs);
 
 		const nativeFirmwareCheck = () => api.call('veci.firmware', 'check', {}, { timeout: 20000 });
 		void bindFirmwareUpdates({ api, root, toast, confirm, nativeFirmwareCheck });
