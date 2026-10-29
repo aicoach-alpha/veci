@@ -35,6 +35,22 @@ method_capabilities() {
 		"$opennds" "$sqm" "$ddns" "$wireguard" "$voucher" "$cellular"
 }
 
+method_app_catalog() {
+ items=''
+ for pair in opennds:opennds sqm:sqm-scripts ddns:ddns-scripts wireguard:wireguard-tools adblock:adblock-fast wol:etherwake; do
+  key=${pair%%:*}; pkg=${pair#*:}; installed=false
+  if command -v apk >/dev/null 2>&1; then
+   apk info -e "$pkg" >/dev/null 2>&1 && installed=true
+  elif command -v opkg >/dev/null 2>&1; then
+   opkg status "$pkg" 2>/dev/null | grep -q '^Status:.*installed' && installed=true
+  fi
+  items="${items:+$items, }{\"id\":\"$key\",\"package\":\"$pkg\",\"installed\":$installed}"
+ done
+ available=$(df -Pk /overlay 2>/dev/null | awk 'NR==2 {print $4+0}')
+ case "$available" in ''|*[!0-9]*) available=0;; esac
+ printf '{ "apps": [%s], "freeOverlayKB": %s, "operationsEnabled": false }\n' "$items" "$available"
+}
+
 method_clients() {
 	now=$(date +%s)
 	items=''
@@ -181,11 +197,12 @@ method_wifi_reload() {
 
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "appCatalog": {}, "clients": {}, "networkInventory": {}, "health": {}, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
 		;;
 	call)
 		case "$2" in
 			capabilities) method_capabilities ;;
+			appCatalog) method_app_catalog ;;
 			clients) method_clients ;;
 			networkInventory) method_network_inventory ;;
 			health) method_health ;;
