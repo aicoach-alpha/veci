@@ -65,3 +65,9 @@ test('APK simulation parser protects core packages without blocking optional app
 		assert.equal(result.status, blocked ? 0 : 1, pkg + ' ' + result.stderr);
 	}
 });
+
+test('App catalog suppresses Guest removal when Voucher is installed', () => {
+	assert.match(script, /\[ "\$id" = guest \] && package_installed veci-app-voucher/);
+	const listMethod = script.split('method_apps() {')[1].split('\nmethod_app_action() {')[0];
+	assert.match(listMethod, /removable=false/);
+});

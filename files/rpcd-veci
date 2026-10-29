@@ -336,6 +336,10 @@ EOF
 
 		removable=false
 		[ -n "$(manifest_remove_packages "$manifest")" ] && removable=true
+		# Voucher depends on Guest: do not offer removal while the dependent app remains installed.
+		if [ "$id" = guest ] && package_installed veci-app-voucher; then
+			removable=false
+		fi
 
 		installable=false
 		if [ "$enabled" = true ] && [ "$installed" = false ] && [ "$feed_enabled" = true ] && [ "$manager" = "apk" ] && app_resources_ok; then
