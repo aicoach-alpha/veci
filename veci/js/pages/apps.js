@@ -1,7 +1,7 @@
 import { badge, escapeHtml, setBusy } from '../lib/dom.js';
 
 const fallbackApps = {
-	opennds: ['Guest portal', 'Captive portal engine'],
+	guest: ['Guest portal', 'Captive portal engine'],
 	sqm: ['Smart Queue', 'Queue management'],
 	ddns: ['Dynamic DNS', 'Hostname updates'],
 	wireguard: ['WireGuard', 'VPN capability'],
@@ -48,10 +48,22 @@ export default {
 		let activeModuleCleanup = null;
 
 		const draw = () => {
+			// A missing provider is not proof of a verified signed package index.
 			const feedEnabled =
-				Boolean(state.catalog.feed_enabled) &&
-				(state.deviceApps === null || state.deviceApps.feed_ready === true);
+				state.catalog.feed_enabled === true &&
+				state.deviceApps?.feed_ready === true &&
+				state.deviceApps?.feed_verified === true;
 			const manager = state.catalog.package_manager || 'unknown';
+			const feedBlockReason =
+				state.deviceApps === null
+					? 'Signed-feed verification provider veci.apps is not installed. A Core hot-update does not install optional APKs.'
+					: state.deviceApps.feed_configured !== true
+						? 'No device-matched signed app repository is configured. Guest, Voucher, SQM, DDNS and WireGuard installation stays blocked.'
+						: state.deviceApps.feed_verified !== true
+							? 'This router has not verified the signed app feed for its running firmware. Never use packages from a different kernel build.'
+							: state.deviceApps.feed_ready !== true
+								? 'The signed feed is not ready or does not match this firmware; check exact build ID, signatures and dependencies.'
+								: null;
 			const kernelFeedMismatch = Boolean(state.updateStatus.kernel_feed_mismatch);
 			const overlayInsufficient =
 				Number.isFinite(state.deviceApps?.overlay_free_kb) &&
@@ -109,7 +121,7 @@ export default {
 						.join('')}
 				</div>
 				<div class="notice-card">
-					<strong>${feedEnabled ? 'VeCI app feed is enabled.' : 'VeCI app feed is disabled.'}</strong>
+					<strong>${feedEnabled ? 'VeCI signed app feed is verified and ready.' : 'VeCI signed app installation is blocked.'}</strong>
 					<p>${
 						overlayInsufficient
 							? 'Router flash overlay is too small for a safe optional-app install. Rebuild the firmware with the required apps or use external storage if supported.'
@@ -117,7 +129,10 @@ export default {
 								? 'Kernel ABI mismatch detected. Kernel-dependent apps remain blocked until the exact VeCI-matched feed is configured.'
 								: feedEnabled
 									? `Package manager: ${escapeHtml(manager)}. Install actions are restricted to root-owned app manifests on this router.`
-									: 'Install actions stay locked until a compatible signed feed is configured by the firmware profile.'
+									: escapeHtml(
+											feedBlockReason ||
+												'Install actions stay locked until a compatible signed feed is configured by the firmware profile.'
+										)
 					}</p>
 					${state.deviceApps?.feed_configured === true && state.deviceApps?.feed_verified !== true ? '<button id="verify-app-feed" class="button button-secondary" type="button">Verify signed App Store feed</button>' : ''}
 				</div>

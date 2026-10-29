@@ -71,3 +71,13 @@ test('App catalog suppresses Guest removal when Voucher is installed', () => {
 	const listMethod = script.split('method_apps() {')[1].split('\nmethod_app_action() {')[0];
 	assert.match(listMethod, /removable=false/);
 });
+
+test('Router Apps refuses optimistic install if signed-feed provider is missing', () => {
+	const ui = readFileSync(new URL('../veci/js/pages/apps.js', import.meta.url), 'utf8');
+	assert.match(ui, /state\.deviceApps\?\.feed_ready === true/);
+	assert.match(ui, /state\.deviceApps\?\.feed_verified === true/);
+	assert.doesNotMatch(ui, /state\.deviceApps === null \|\| state\.deviceApps\.feed_ready/);
+	assert.match(ui, /Signed-feed verification provider veci.apps is not installed/);
+	assert.match(ui, /guest: \['Guest portal'/);
+	assert.doesNotMatch(ui, /opennds: \['Guest portal'/);
+});
