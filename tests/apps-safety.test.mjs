@@ -94,3 +94,19 @@ test('Core app catalog returns bounded overlay and memory metrics when feed prov
 	assert.match(ui, /resources\.overlay_free_kb/);
 	assert.match(ui, /resources\.minimum_overlay_kb/);
 });
+
+
+
+test('Router Apps resource guard preserves fail-closed runtime checks', () => {
+  const body = script.split('app_resources_ok() {')[1]?.split('\n}\n\nsafe_package_words()')[0];
+  assert.ok(body, 'resource guard must be present');
+  for (const expected of [
+    'df -Pk /overlay',
+    "case \"$free_kb\" in",
+    '[ "$free_kb" -ge 2048 ]',
+    'MemAvailable:',
+    "case \"$mem_kb\" in",
+    '[ "$mem_kb" -ge 8192 ]'
+  ]) assert.ok(body.includes(expected), expected);
+  assert.doesNotMatch(body, /printf '\\{ "package_manager"/);
+});
