@@ -812,7 +812,8 @@ export default {
 		try {
 			const settings = await api.call('veci.sms', 'getConfig', {}, { timeout: 4000 });
 			if (settings?.ok !== true || typeof settings.enabled !== 'boolean') throw Error('SMS settings unavailable');
-			smsMode = settings.mode === 'receive_only' ? 'receive_only' : 'full';
+			if (!['receive_only', 'full'].includes(settings.mode)) throw Error('Unsupported SMS backend mode');
+			smsMode = settings.mode;
 			presentSmsSetting(settings.enabled);
 		} catch {
 			smsToggle.disabled = true;
@@ -821,7 +822,7 @@ export default {
 				'SMS backend unavailable or not authorized for this account. No messages can be accessed.';
 		}
 		const openCompose = (number = '') => {
-			if (!smsEnabled) return;
+			if (!smsEnabled || smsMode === 'receive_only') return;
 			selectedDraft = null;
 			smsDraftSave.textContent = 'Save Draft';
 			smsCompose.hidden = false;
@@ -830,7 +831,7 @@ export default {
 		};
 		smsComposeOpen.addEventListener('click', () => openCompose());
 		smsSentOpen.addEventListener('click', async () => {
-			if (!smsEnabled) return;
+			if (!smsEnabled || smsMode === 'receive_only') return;
 			const turn = ++smsSentGeneration;
 			smsSentPanel.hidden = false;
 			smsSentOutput.replaceChildren();
@@ -892,7 +893,7 @@ export default {
 		});
 
 		async function renderDrafts() {
-			if (!smsEnabled) return;
+			if (!smsEnabled || smsMode === 'receive_only') return;
 			const turn = ++draftGeneration;
 			smsDraftPanel.hidden = false;
 			smsDraftStatus.textContent = 'Loading Drafts…';

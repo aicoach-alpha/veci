@@ -51,6 +51,10 @@
 	margin: 10px 0;
 	font-weight: 500;
 }
+/* Buttons use display:inline-flex in app.css. Override with author [hidden]. */
+#cellular-sms-compose-open[hidden],
+#cellular-sms-sent-open[hidden],
+#cellular-sms-drafts-open[hidden],
 #cellular-sms-inbox-controls[hidden],
 #cellular-sms-compose[hidden],
 #cellular-sms-drafts-panel[hidden],
