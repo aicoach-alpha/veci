@@ -769,6 +769,7 @@ export default {
 		smsSearch.addEventListener('input', filterSms);
 		smsFilter.addEventListener('change', filterSms);
 		let smsEnabled = false;
+		let smsMode = 'unavailable';
 		let smsGeneration = 0;
 		function clearSms() {
 			smsGeneration += 1;
@@ -787,7 +788,19 @@ export default {
 			smsToggle.checked = enabled;
 			smsToggle.disabled = false;
 			smsControls.hidden = !enabled;
-			smsState.textContent = enabled ? 'SMS enabled' : 'SMS disabled — no messages can be read';
+			smsState.textContent = enabled
+				? smsMode === 'receive_only'
+					? 'Inbox enabled (read-only). Sending, deletion, drafts and sent history are not supported by this backend.'
+					: 'SMS enabled'
+				: 'SMS disabled — no messages can be read';
+			if (smsMode === 'receive_only') {
+				smsComposeOpen.hidden = true;
+				smsSentOpen.hidden = true;
+				smsDraftOpen.hidden = true;
+				smsCompose.hidden = true;
+				smsDraftPanel.hidden = true;
+				smsSentPanel.hidden = true;
+			}
 			if (!enabled) {
 				clearSms();
 				smsCompose.hidden = true;
@@ -799,11 +812,13 @@ export default {
 		try {
 			const settings = await api.call('veci.sms', 'getConfig', {}, { timeout: 4000 });
 			if (settings?.ok !== true || typeof settings.enabled !== 'boolean') throw Error('SMS settings unavailable');
+			smsMode = settings.mode === 'receive_only' ? 'receive_only' : 'full';
 			presentSmsSetting(settings.enabled);
 		} catch {
 			smsToggle.disabled = true;
 			smsControls.hidden = true;
-			smsState.textContent = 'SMS settings unavailable for this account.';
+			smsState.textContent =
+				'SMS backend unavailable or not authorized for this account. No messages can be accessed.';
 		}
 		const openCompose = (number = '') => {
 			if (!smsEnabled) return;
@@ -984,7 +999,7 @@ export default {
 		}
 		smsDraftOpen.addEventListener('click', renderDrafts);
 		smsDraftSave.addEventListener('click', async () => {
-			if (!smsEnabled || smsDraftSave.disabled) return;
+			if (!smsEnabled || smsMode === 'receive_only' || smsDraftSave.disabled) return;
 			let pdu;
 			try {
 				pdu = buildSmsSubmit(smsTo.value.trim(), smsText.value);
@@ -1042,7 +1057,7 @@ export default {
 		});
 		smsCompose.addEventListener('submit', async event => {
 			event.preventDefault();
-			if (!smsEnabled || smsSend.disabled) return;
+			if (!smsEnabled || smsMode === 'receive_only' || smsSend.disabled) return;
 			const recipient = smsTo.value.trim(),
 				message = smsText.value;
 			let plan;
@@ -1167,7 +1182,8 @@ export default {
 					{ state: desired ? 'on' : 'off' },
 					{ timeout: 5000 }
 				);
-				if (result?.ok !== true || result.enabled !== desired) throw Error('Unable to update SMS setting');
+				if (result?.ok !== true || result.enabled !== desired || result.mode !== smsMode)
+					throw Error('Unable to update SMS setting');
 				presentSmsSetting(desired);
 				toast(desired ? 'SMS enabled.' : 'SMS disabled.', 'success');
 			} catch {

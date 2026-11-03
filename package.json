@@ -24,7 +24,7 @@
 		"test:quota": "node --test tests/quota.test.mjs",
 		"test:modem": "node --test tests/modem-messages.test.mjs",
 		"test:firmware": "node --test tests/firmware-updates.test.mjs",
-		"test:cellular": "node --test tests/cellular-parity.test.mjs"
+		"test:cellular": "node --test tests/cellular-parity.test.mjs tests/sms-inbox-readonly.test.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "9.39.1",
