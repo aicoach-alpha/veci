@@ -557,11 +557,11 @@ export default {
 		// The router's Content-Security-Policy is style-src 'self'.
 		// Inline <style> and style="..." are blocked; load a local CSS file.
 		// Keep a single stylesheet when navigating away/back to Cellular.
-		if (!document.getElementById('veci-sms-center-v159-css')) {
+		if (!document.getElementById('veci-sms-center-v160-css')) {
 			const link = document.createElement('link');
-			link.id = 'veci-sms-center-v159-css';
+			link.id = 'veci-sms-center-v160-css';
 			link.rel = 'stylesheet';
-			link.href = '/veci/sms-center.css?v=159';
+			link.href = '/veci/sms-center.css?v=160';
 			document.head.appendChild(link);
 		}
 
@@ -794,12 +794,14 @@ export default {
 					: 'SMS enabled'
 				: 'SMS disabled — no messages can be read';
 			if (smsMode === 'receive_only') {
-				smsComposeOpen.hidden = true;
-				smsSentOpen.hidden = true;
-				smsDraftOpen.hidden = true;
-				smsCompose.hidden = true;
-				smsDraftPanel.hidden = true;
-				smsSentPanel.hidden = true;
+				// Remove unsupported actions from DOM entirely. This remains
+				// reliable even when older cached CSS overrides [hidden].
+				smsComposeOpen.remove();
+				smsSentOpen.remove();
+				smsDraftOpen.remove();
+				smsCompose.remove();
+				smsDraftPanel.remove();
+				smsSentPanel.remove();
 			}
 			if (!enabled) {
 				clearSms();

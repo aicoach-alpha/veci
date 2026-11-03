@@ -59,7 +59,7 @@
 #cellular-sms-compose[hidden],
 #cellular-sms-drafts-panel[hidden],
 #cellular-sms-sent-panel[hidden] {
-	display: none;
+	display: none !important;
 }
 @media (max-width: 640px) {
 	.sms-message-card {
