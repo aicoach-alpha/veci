@@ -37,13 +37,14 @@ export default {
 	icon: 'home',
 
 	async render({ api, state, root, navigate, toast }) {
-		const [system, interfacesResult, wireless, wirelessConfig, clients, security] = await Promise.all([
+		const [system, interfacesResult, wireless, wirelessConfig, clients, security, performance] = await Promise.all([
 			api.systemInfo(),
 			api.interfaces(),
 			api.wirelessStatus().catch(() => ({})),
 			api.uciGet('wireless').catch(() => ({ values: {} })),
 			api.veci('clients').catch(() => ({ clients: [] })),
-			api.veci('securityStatus').catch(() => ({ root_password_set: true }))
+			api.veci('securityStatus').catch(() => ({ root_password_set: true })),
+			api.call('veci.cellular', 'performanceStatus', {}, { timeout: 2500 }).catch(() => ({ ok: false }))
 		]);
 
 		const interfaces = interfacesResult.interface || [];
@@ -108,6 +109,28 @@ export default {
 				</article>
 			</section>
 
+            <section class="content-grid content-grid-2" aria-label="Connection stability">
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">CELLULAR RELIABILITY</p><h3>LTE Recovery</h3></div></div>
+                    <p id="perf-lte-stage">Not monitored</p>
+                    <div class="detail-list compact">
+                        <div><span>Monitor interval</span><strong id="perf-lte-poll">Not available</strong></div>
+                        <div><span>Consecutive failures</span><strong id="perf-lte-fail">—</strong></div>
+                        <div><span>Strategy</span><strong>DHCP first · modem reset last</strong></div>
+                    </div>
+                    <button class="text-link" data-go="cellular" type="button">Mobile connection</button>
+                </article>
+                <article class="panel">
+                    <div class="panel-heading"><div><p class="eyebrow">WI-FI RELIABILITY</p><h3>Wi-Fi Guardian</h3></div></div>
+                    <p id="perf-wifi-stage">Not monitored</p>
+                    <div class="detail-list compact">
+                        <div><span>Monitor interval</span><strong id="perf-wifi-poll">Not available</strong></div>
+                        <div><span>Consecutive failures</span><strong id="perf-wifi-fail">—</strong></div>
+                        <div><span>Strategy</span><strong>Stable channel · guarded AP recovery</strong></div>
+                    </div>
+                    <button class="text-link" data-go="wifi" type="button">Wi-Fi stability</button>
+                </article>
+            </section>
 			<section class="metric-grid">
 				<button class="metric-card metric-link" data-go="internet" type="button">
 					<span class="metric-icon">${icon('globe', 'svg-icon')}</span>
@@ -158,6 +181,44 @@ export default {
 				</article>
 			</section>
 		`;
+
+		// Read-only statuses; never claim the connection is healthy when
+		// the tiny /tmp monitor has not actually run.
+		if (performance?.ok === true && performance?.source === 'local_tmpfs_monitors') {
+			const label = {
+				healthy: 'Healthy · monitoring',
+				stale: 'Monitor data stale · state unverified',
+				dhcp_renew: 'Restoring DHCP',
+				recovered_dhcp: 'Restored · DHCP',
+				interface_recovery: 'Repairing LTE interface',
+				recovered_interface: 'Restored · LTE interface',
+				modem_soft_reconnect: 'Recovering modem registration',
+				recovered_soft: 'Restored · cellular modem',
+				upstream_degraded: 'Gateway reachable · Internet degraded',
+				power_cycle_cooldown: 'Reset cooldown active',
+				last_resort_power_cycle: 'Last-resort modem reset',
+				ready: 'Access point operational',
+				radio_recovery: 'Recovering missing access point',
+				ap_not_ready: 'Access point not ready',
+				intentionally_disabled: 'Wi-Fi intentionally disabled',
+				hold_associated_or_unknown: 'Conservative hold · clients may be connected',
+				cooldown_or_observe: 'Monitoring · cooldown'
+			};
+			const updateText = (id, value) => {
+				const element = root.querySelector(id);
+				if (element) element.textContent = String(value);
+			};
+			const lte = performance.lte || {};
+			const wifi = performance.wifi || {};
+			updateText('#perf-lte-stage', label[lte.stage] || 'Not monitored');
+			updateText('#perf-wifi-stage', label[wifi.stage] || 'Not monitored');
+			if (Number.isInteger(lte.check_interval_seconds) && lte.check_interval_seconds > 0)
+				updateText('#perf-lte-poll', String(lte.check_interval_seconds) + ' sec');
+			if (Number.isInteger(wifi.check_interval_seconds) && wifi.check_interval_seconds > 0)
+				updateText('#perf-wifi-poll', String(wifi.check_interval_seconds) + ' sec');
+			if (Number.isInteger(lte.failures) && lte.failures >= 0) updateText('#perf-lte-fail', lte.failures);
+			if (Number.isInteger(wifi.failures) && wifi.failures >= 0) updateText('#perf-wifi-fail', wifi.failures);
+		}
 
 		if (uplink) {
 			api.veci('internetStatus', {}, { timeout: 3000 })

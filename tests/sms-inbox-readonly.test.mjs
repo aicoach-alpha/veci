@@ -36,5 +36,5 @@ test('unsupported actions are physically removed and cache-busted', () => {
 	const app = readFileSync(new URL('../veci/js/app.js', import.meta.url), 'utf8');
 	const index = readFileSync(new URL('../veci/index.html', import.meta.url), 'utf8');
 	assert.match(app, /pages\/cellular\.js\?v=160/);
-	assert.match(index, /js\/app\.js\?v=160/);
+	assert.match(index, /js\/app\.js\?v=161/);
 });

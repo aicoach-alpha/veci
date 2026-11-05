@@ -2,7 +2,7 @@ import { VeciApi } from './lib/api.js';
 import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js';
 import { hydrateIcons, icon } from './lib/icons.js';
 
-import homePage from './pages/home.js';
+import homePage from './pages/home.js?v=161';
 import internetPage from './pages/internet.js';
 import wifiPage from './pages/wifi.js';
 import devicesPage from './pages/devices.js';
