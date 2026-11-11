@@ -1,0 +1,65 @@
+name: Build MT7628 candidate module (non-deploy)
+on:
+  push:
+    branches:
+      - fix/mt7628-incident-20261111
+    paths:
+      - firmware/**
+      - .github/workflows/mt7628-kmod.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mt7603-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDK prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y zstd xz-utils build-essential file git ca-certificates libncurses-dev python3 rsync
+      - name: Download and authenticate exact 25.12.5 SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=https://downloads.openwrt.org/releases/25.12.5/targets/ramips/mt76x8
+          sdk=openwrt-sdk-25.12.5-ramips-mt76x8_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl --fail --location --retry 3 "$base/$sdk" -o "$sdk"
+          curl --fail --location --retry 3 "$base/sha256sums" -o sha256sums
+          checksum="$(awk -v filename="$sdk" '$2==filename || $2=="*"filename {print $1; exit}' sha256sums)"
+          test -n "$checksum"
+          echo "$checksum  $sdk" | sha256sum --check --status
+          echo SDK_SHA256_PASS
+          mkdir sdk
+          tar --zstd -xf "$sdk" -C sdk --strip-components=1
+      - name: Stage MT7603 upstream patch and configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f sdk/package/kernel/mt76/Makefile
+          mkdir -p sdk/package/kernel/mt76/patches
+          cp firmware/patches/mt76/100-mt7603-defer-channel-error-watchdog.patch sdk/package/kernel/mt76/patches/999-veci-mt7603-channel-error.patch
+          cd sdk
+          printf '\nCONFIG_PACKAGE_kmod-mt7603=y\n' >> .config
+          make defconfig
+          grep 'CONFIG_PACKAGE_kmod-mt7603' .config
+      - name: Compile candidate only
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C sdk package/kernel/mt76/compile -j2 V=s
+          find sdk/bin -type f \( -iname '*mt7603*.apk' -o -iname '*mt7603*.ipk' \) -print | tee candidate-files.txt
+          test -s candidate-files.txt
+          sha256sum $(cat candidate-files.txt) | tee candidate-sha256.txt
+      - name: Store candidate without installing on router
+        uses: actions/upload-artifact@v4
+        with:
+          name: veCI-mt7603-25.12.5-candidate-UNTESTED
+          path: |
+            candidate-files.txt
+            candidate-sha256.txt
+            sdk/bin/packages/
+          retention-days: 7

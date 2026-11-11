@@ -1,0 +1,23 @@
+From: VeCI field triage (based on openwrt/mt76 PR #1166)
+Subject: [PATCH] wifi: mt76: mt7603: defer watchdog on channel error
+
+MT7628 channel-error recovery must not synchronously invoke mac_work
+while mt76_set_channel() holds dev->mutex. Queue it after the current
+callback returns. Upstream original: https://github.com/openwrt/mt76/pull/1166
+
+DO NOT install as an unverified runtime module. Apply to exact firmware
+source tree, compile with matching kernel/SDK and validate vermagic,
+loaded module ABI, and isolated-device regression tests.
+
+--- a/mt7603/main.c
++++ b/mt7603/main.c
+@@ -193,7 +193,8 @@ int mt7603_set_channel(struct mt76_phy *mphy)
+ 	tasklet_enable(&dev->mt76.pre_tbtt_tasklet);
+ 
+ 	if (failed)
+-		mt7603_mac_work(&dev->mphy.mac_work.work);
++		ieee80211_queue_delayed_work(mt76_hw(dev),
++					     &dev->mphy.mac_work, 0);
+ 
+ 	return ret;
+ }
