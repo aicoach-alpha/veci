@@ -31,7 +31,7 @@ jobs:
           curl --fail --location --retry 3 "$base/sha256sums" -o sha256sums
           checksum="$(awk -v filename="$sdk" '$2==filename || $2=="*"filename {print $1; exit}' sha256sums)"
           test -n "$checksum"
-          printf '%s  %s\\n' "$checksum" "$sdk" | sha256sum --check --status
+          echo "$checksum  $sdk" | sha256sum --check --status
           echo SDK_SHA256_PASS
           mkdir sdk
           tar --zstd -xf "$sdk" -C sdk --strip-components=1
