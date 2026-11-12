@@ -235,7 +235,7 @@ method_wifi_reload() {
 
 method_ipv6_status() {
 	[ -x /usr/libexec/veci-ipv6-policy ] || {
-		printf '{ "ok": false, "error": "ipv6_policy_unavailable" }\\n'
+		printf '{ "ok": false, "error": "ipv6_policy_unavailable" }\n'
 		return
 	}
 	/usr/libexec/veci-ipv6-policy status
@@ -243,7 +243,7 @@ method_ipv6_status() {
 
 method_ipv6_configure() {
 	[ -x /usr/libexec/veci-ipv6-policy ] || {
-		printf '{ "ok": false, "error": "ipv6_policy_unavailable" }\\n'
+		printf '{ "ok": false, "error": "ipv6_policy_unavailable" }\n'
 		return
 	}
 	/usr/libexec/veci-ipv6-policy configure
