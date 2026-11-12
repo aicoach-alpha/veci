@@ -1,0 +1,48 @@
+name: VeCI production-pinned IPv6 and canonical menu checks
+on:
+  pull_request:
+    paths:
+      - 'files/veci-ipv6-*'
+      - 'files/rpcd-veci'
+      - 'files/veci.config'
+      - 'rpcd-acl.json'
+      - 'veci/js/**'
+      - 'tests/**'
+      - '.github/workflows/ipv6-menu-stability.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shell syntax
+        run: |
+          sh -n files/rpcd-veci
+          sh -n files/veci-ipv6-policy
+          sh -n files/veci-ipv6-init
+      - name: Canonical menu tests
+        run: node --test tests/menu-policy.test.mjs
+      - name: Verify constrained RPC and zero-live-apply contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          acl=json.loads(Path('rpcd-acl.json').read_text())['veci']
+          assert 'ipv6Status' in acl['read']['ubus']['veci']
+          assert 'ipv6Configure' in acl['write']['ubus']['veci']
+          src=Path('files/veci-ipv6-policy').read_text()
+          configure=src.split('configure() {',1)[1].split('\nboot() {',1)[0]
+          for verb in ('sysctl -w', 'ifup ', 'ifdown ', 'wifi reload', '/etc/init.d/', 'reboot', 'network reload'):
+              assert verb not in configure, verb
+          assert 'managed || exit 0' in src
+          assert 'legacy_ipv4_only_policy_requires_migration' in src
+          assert "option enabled '0'" in Path('files/veci.config').read_text()
+          system=Path('veci/js/pages/system.js').read_text()
+          assert 'bindFirmwareUpdates' not in system
+          assert "navigate('updates')" in system
+          app=Path('veci/js/app.js').read_text()
+          assert 'primaryNavigation(pages' in app
+          assert 'menuOwner(page.id)' in app
+          print('Production pinned VeCI menu and IPv6 source gates PASS')
+          PY
