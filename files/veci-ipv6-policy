@@ -53,6 +53,11 @@ write_sysctl_policy() {
         done
     } > "$tmp"
     chmod 600 "$tmp"
+    if [ -f "$SYSCTL_POLICY" ] && command -v cmp >/dev/null 2>&1 &&
+       cmp -s "$tmp" "$SYSCTL_POLICY"; then
+        rm -f "$tmp"
+        return 0
+    fi
     mv -f "$tmp" "$SYSCTL_POLICY"
 }
 set_if_changed() {
