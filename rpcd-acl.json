@@ -20,7 +20,8 @@
 					"logs",
 					"diagnostic",
 					"firmwareStatus",
-					"firmwareRemoteCheck"
+					"firmwareRemoteCheck",
+					"ipv6Status"
 				],
 				"veci.cellular": ["status"],
 				"veci.app.*": ["status", "clients"]
@@ -43,7 +44,8 @@
 					"firmwareValidate",
 					"firmwareRemoteDownload",
 					"firmwarePolicySave",
-					"firmwareApply"
+					"firmwareApply",
+					"ipv6Configure"
 				],
 				"veci.cellular": ["reconnect", "switchSim"],
 				"veci.app.*": ["save", "action", "create", "createBatch", "revoke", "cleanup", "disconnect"]

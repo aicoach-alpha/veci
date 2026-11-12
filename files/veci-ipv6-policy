@@ -1,0 +1,146 @@
+#!/bin/sh
+# VeCI IPv6 policy. Apply only during boot: never reload Wi-Fi, LTE or netifd in an RPC request.
+set -eu
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+SYSCTL_POLICY=/etc/sysctl.d/97-veci-ipv6-policy.conf
+LEGACY_POLICY=/etc/sysctl.d/99-veci-ipv4-only.conf
+
+error() { printf '{"ok":false,"error":"%s"}\n' "$1"; exit 0; }
+enabled() {
+    value="$(uci -q get veci.ipv6.enabled 2>/dev/null || :)"
+    case "$value" in 1) echo 1 ;; *) echo 0 ;; esac
+}
+kernel_disabled() {
+    sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null || printf 'unknown\n'
+}
+legacy_conflict() {
+    [ -f "$LEGACY_POLICY" ] && grep -q '^net.ipv6.conf.all.disable_ipv6=1$' "$LEGACY_POLICY"
+}
+managed() {
+    uci -q get veci.ipv6 >/dev/null 2>&1
+}
+status() {
+    desired="$(enabled)"
+    runtime="$(kernel_disabled)"
+    pending=true
+    if [ "$desired" = 0 ] && [ "$runtime" = 1 ]; then pending=false; fi
+    if [ "$desired" = 1 ] && [ "$runtime" = 0 ] && ! legacy_conflict; then pending=false; fi
+    conflict=false
+    if legacy_conflict; then conflict=true; fi
+    ismanaged=true
+    if ! managed; then ismanaged=false; fi
+    [ "$desired" = 1 ] && desired=true || desired=false
+    case "$runtime" in
+        0) runtime=enabled ;;
+        1) runtime=disabled ;;
+        *) runtime=unknown ;;
+    esac
+    printf '{"ok":true,"desiredEnabled":%s,"runtime":"%s","pendingReboot":%s,"legacyConflict":%s,"managed":%s,"appliesAt":"next_boot"}\n'         "$desired" "$runtime" "$pending" "$conflict" "$ismanaged"
+}
+write_sysctl_policy() {
+    # Never follow a symlink. Atomic replacement keeps the boot-time setting readable.
+    if [ -L "$SYSCTL_POLICY" ]; then return 1; fi
+    tmp="$(mktemp /etc/sysctl.d/.veci-ipv6.XXXXXX)" || return 1
+    mode="$1"
+    if [ "$mode" = 1 ]; then disabled=0; else disabled=1; fi
+    {
+        printf '# VeCI managed IPv6 policy; changed only on explicit configuration.\n'
+        for key in all default lo; do
+            printf 'net.ipv6.conf.%s.disable_ipv6=%s\n' "$key" "$disabled"
+        done
+    } > "$tmp"
+    chmod 600 "$tmp"
+    if [ -f "$SYSCTL_POLICY" ] && command -v cmp >/dev/null 2>&1 &&
+       cmp -s "$tmp" "$SYSCTL_POLICY"; then
+        rm -f "$tmp"
+        return 0
+    fi
+    mv -f "$tmp" "$SYSCTL_POLICY"
+}
+set_if_changed() {
+    setting_key="$1"
+    setting_value="$2"
+    setting_current="$(uci -q get "$setting_key" 2>/dev/null || :)"
+    if [ "$setting_current" != "$setting_value" ]; then
+        uci set "$setting_key=$setting_value"
+        CHANGED=1
+    fi
+}
+configure() {
+    [ "$(id -u)" = 0 ] || error requires_root
+    command -v jsonfilter >/dev/null 2>&1 || error jsonfilter_missing
+    input="$(head -c 128)"
+    requested="$(printf '%s' "$input" | jsonfilter -e '@.enabled' 2>/dev/null || :)"
+    case "$requested" in
+        true) desired=1 ;;
+        false) desired=0 ;;
+        *) error invalid_boolean ;;
+    esac
+    if [ "$desired" = 1 ] && legacy_conflict; then
+        error legacy_ipv4_only_policy_requires_migration
+    fi
+    old="$(enabled)"
+    if [ "$old" = "$desired" ] && managed; then status; return; fi
+    if ! managed; then
+        uci set veci.ipv6=ipv6 || error uci_write_failed
+    fi
+    # Persist desired mode only; the running network remains unchanged.
+    uci set "veci.ipv6.enabled=$desired" || error uci_write_failed
+    uci commit veci || error uci_commit_failed
+    # No sysctl, interface, modem, radio or service operation here.
+    status
+}
+boot() {
+    [ "$(id -u)" = 0 ] || exit 1
+    # Preserve pre-existing router configuration on upgrades where the managed
+    # VeCI IPv6 section has never been explicitly initialized.
+    managed || exit 0
+    desired="$(enabled)"
+    if [ "$desired" = 1 ] && legacy_conflict; then
+        logger -t veci-ipv6 'legacy IPv4-only policy conflicts with requested IPv6; refusing partial enable' || :
+        exit 1
+    fi
+    # This is deliberately narrow. No changes to unrelated user-defined interfaces.
+    CHANGED=0
+    if uci -q get network.wan6 >/dev/null 2>&1; then
+        if [ "$desired" = 1 ]; then set_if_changed network.wan6.disabled 0
+        else set_if_changed network.wan6.disabled 1; fi
+    fi
+    if uci -q get network.lan >/dev/null 2>&1; then
+        set_if_changed network.lan.ipv6 "$desired"
+        if [ "$desired" = 1 ]; then
+            current="$(uci -q get network.lan.ip6assign 2>/dev/null || :)"
+            [ -n "$current" ] || set_if_changed network.lan.ip6assign 60
+        fi
+    fi
+    [ "$CHANGED" = 0 ] || uci commit network
+    CHANGED=0
+    if uci -q get dhcp.lan >/dev/null 2>&1; then
+        if [ "$desired" = 1 ]; then
+            set_if_changed dhcp.lan.ra server
+            set_if_changed dhcp.lan.dhcpv6 server
+        else
+            set_if_changed dhcp.lan.ra disabled
+            set_if_changed dhcp.lan.dhcpv6 disabled
+        fi
+        # No NDP proxy by default in either mode.
+        set_if_changed dhcp.lan.ndp disabled
+    fi
+    [ "$CHANGED" = 0 ] || uci commit dhcp
+    write_sysctl_policy "$desired"
+    if [ "$desired" = 1 ]; then disable=0; else disable=1; fi
+    for key in default all lo; do
+        sysctl -w "net.ipv6.conf.$key.disable_ipv6=$disable" >/dev/null 2>&1 || :
+    done
+    # No service restart: runs before the normal network startup on boot.
+    logger -t veci-ipv6 'boot mode staged without network or Wi-Fi reload' || :
+}
+case "${1:-}" in
+    status) status ;;
+    configure) configure ;;
+    boot) boot ;;
+    *) error method_not_allowed ;;
+esac

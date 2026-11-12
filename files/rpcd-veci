@@ -1185,9 +1185,25 @@ method_wifi_reload() {
 	fi
 }
 
+method_ipv6_status() {
+	[ -x /usr/libexec/veci-ipv6-policy ] || {
+		printf '{ "ok": false, "error": "ipv6_policy_unavailable" }\n'
+		return
+	}
+	/usr/libexec/veci-ipv6-policy status
+}
+
+method_ipv6_configure() {
+	[ -x /usr/libexec/veci-ipv6-policy ] || {
+		printf '{ "ok": false, "error": "ipv6_policy_unavailable" }\n'
+		return
+	}
+	/usr/libexec/veci-ipv6-policy configure
+}
+
 case "$1" in
 	list)
-		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {} }\n'
+		printf '{ "capabilities": {}, "clients": {}, "networkInventory": {}, "health": {}, "internetStatus": {}, "updateStatus": {}, "apps": {}, "appAction": { "id": "str", "action": "str" }, "firmwareStatus": {}, "firmwareUploadStart": { "filename": "str", "size": "int" }, "firmwareUploadChunk": { "upload_id": "str", "sequence": "int", "data": "str" }, "firmwareUploadFinish": { "upload_id": "str" }, "firmwareValidate": { "expected_sha256": "str" }, "firmwareRemoteCheck": {}, "firmwareRemoteDownload": {}, "firmwarePolicySave": { "auto_check": "bool", "auto_download": "bool", "auto_install": "bool" }, "firmwareApply": { "apply_token": "str", "keep_settings": "bool" }, "securityStatus": {}, "setAdminPassword": { "password": "str" }, "logs": { "source": "str", "limit": "int" }, "diagnostic": { "tool": "str", "target": "str" }, "serviceAction": { "service": "str", "action": "str" }, "wifiReload": {}, "ipv6Status": {}, "ipv6Configure": { "enabled": "bool" } }\n'
 		;;
 	call)
 		case "$2" in
@@ -1214,6 +1230,8 @@ case "$1" in
 			diagnostic) method_diagnostic ;;
 			serviceAction) method_service_action ;;
 			wifiReload) method_wifi_reload ;;
+			ipv6Status) method_ipv6_status ;;
+			ipv6Configure) method_ipv6_configure ;;
 			*) printf '{ "error": "method_not_found" }\n' ;;
 		esac
 		;;

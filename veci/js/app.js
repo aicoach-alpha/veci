@@ -1,33 +1,24 @@
 import { VeciApi } from './lib/api.js';
 import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js';
 import { hydrateIcons, icon } from './lib/icons.js';
+import { primaryNavigation, routeTarget, menuOwner } from './lib/menu-policy.js';
 
 import homePage from './pages/home.js?v=161';
 import internetPage from './pages/internet.js';
 import wifiPage from './pages/wifi.js';
-import devicesPage from './pages/devices.js';
 import securityPage from './pages/security.js';
 import networkPage from './pages/network.js';
 import systemPage from './pages/system.js';
 import cellularPage from './pages/cellular.js?v=160';
-import updatesPage from './pages/updates.js';
 import appsPage from './pages/apps.js';
-import hotspotPage from './pages/hotspot.js';
 
-const pages = [
-	homePage,
-	internetPage,
-	wifiPage,
-	devicesPage,
-	cellularPage,
-	hotspotPage,
-	securityPage,
-	networkPage,
-	systemPage,
-	updatesPage,
-	appsPage
-];
+const pages = [homePage, internetPage, wifiPage, cellularPage, securityPage, networkPage, systemPage, appsPage];
 const pageMap = new Map(pages.map(page => [page.id, page]));
+const lazyPages = {
+	devices: () => import('./pages/devices.js'),
+	hotspot: () => import('./pages/hotspot.js'),
+	updates: () => import('./pages/updates.js')
+};
 
 class VeciApp {
 	constructor() {
@@ -122,8 +113,7 @@ class VeciApp {
 
 	renderNavigation() {
 		const nav = qs('#primary-nav');
-		nav.innerHTML = pages
-			.filter(page => !page.capability || this.state.capabilities?.[page.capability] !== false)
+		nav.innerHTML = primaryNavigation(pages, this.state.capabilities)
 			.map(
 				page => `
 				<a class="nav-link" href="#/${page.id}" data-route="${page.id}">
@@ -147,21 +137,33 @@ class VeciApp {
 	}
 
 	navigate(pageId) {
-		window.location.hash = `#/${pageId}`;
+		window.location.hash = `#/${routeTarget(pageId)}`;
 	}
 
 	async route() {
 		if (!this.api.sessionId) return;
 		const requestId = ++this.pageRequest;
-		const pageId = (window.location.hash.replace(/^#\//, '').split('/')[0] || 'home').toLowerCase();
-		const page = pageMap.get(pageId) || homePage;
+		const pageId = routeTarget(window.location.hash.replace(/^#\//, '').split('/')[0] || 'home');
+		let page = pageMap.get(pageId);
+		if (!page && lazyPages[pageId]) {
+			try {
+				page = (await lazyPages[pageId]()).default;
+				if (requestId !== this.pageRequest) return;
+				pageMap.set(pageId, page);
+			} catch (error) {
+				console.error('Optional page failed to load', error);
+			}
+		}
+		page ||= homePage;
 
 		if (this.activeCleanup) {
 			this.activeCleanup();
 			this.activeCleanup = null;
 		}
 
-		qsa('.nav-link[data-route]').forEach(link => link.classList.toggle('active', link.dataset.route === page.id));
+		qsa('.nav-link[data-route]').forEach(link =>
+			link.classList.toggle('active', link.dataset.route === menuOwner(page.id))
+		);
 		qs('#page-eyebrow').textContent = page.eyebrow || 'ROUTER';
 		qs('#page-title').textContent = page.title;
 		document.body.classList.remove('menu-open');
