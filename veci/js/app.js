@@ -12,16 +12,7 @@ import systemPage from './pages/system.js';
 import cellularPage from './pages/cellular.js?v=160';
 import appsPage from './pages/apps.js';
 
-const pages = [
-	homePage,
-	internetPage,
-	wifiPage,
-	cellularPage,
-	securityPage,
-	networkPage,
-	systemPage,
-	appsPage
-];
+const pages = [homePage, internetPage, wifiPage, cellularPage, securityPage, networkPage, systemPage, appsPage];
 const pageMap = new Map(pages.map(page => [page.id, page]));
 const lazyPages = {
 	devices: () => import('./pages/devices.js'),
@@ -170,7 +161,9 @@ class VeciApp {
 			this.activeCleanup = null;
 		}
 
-		qsa('.nav-link[data-route]').forEach(link => link.classList.toggle('active', link.dataset.route === menuOwner(page.id)));
+		qsa('.nav-link[data-route]').forEach(link =>
+			link.classList.toggle('active', link.dataset.route === menuOwner(page.id))
+		);
 		qs('#page-eyebrow').textContent = page.eyebrow || 'ROUTER';
 		qs('#page-title').textContent = page.title;
 		document.body.classList.remove('menu-open');
