@@ -24,7 +24,9 @@ const SUBPAGE_OWNER = Object.freeze({
 });
 
 export function routeTarget(route) {
-	const key = String(route || '').trim().toLowerCase();
+	const key = String(route || '')
+		.trim()
+		.toLowerCase();
 	return ROUTE_ALIAS[key] || key;
 }
 export function menuOwner(route) {
