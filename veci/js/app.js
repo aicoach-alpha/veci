@@ -119,8 +119,7 @@ class VeciApp {
 
 	renderNavigation() {
 		const nav = qs('#primary-nav');
-		nav.innerHTML = pages
-			.filter(page => primaryNavigation(pages, this.state.capabilities).includes(page))
+		nav.innerHTML = primaryNavigation(pages, this.state.capabilities)
 			.map(
 				page => `
 				<a class="nav-link" href="#/${page.id}" data-route="${page.id}">
@@ -144,13 +143,13 @@ class VeciApp {
 	}
 
 	navigate(pageId) {
-		window.location.hash = `#/${pageId}`;
+		window.location.hash = `#/${ownerOf(pageId)}`;
 	}
 
 	async route() {
 		if (!this.api.sessionId) return;
 		const requestId = ++this.pageRequest;
-		const pageId = (window.location.hash.replace(/^#\//, '').split('/')[0] || 'home').toLowerCase();
+		const pageId = ownerOf(window.location.hash.replace(/^#\//, '').split('/')[0] || 'home');
 		const page = pageMap.get(pageId) || homePage;
 
 		if (this.activeCleanup) {
