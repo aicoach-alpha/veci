@@ -27,7 +27,7 @@ export default {
 	eyebrow: 'EXTENSIONS',
 	icon: 'apps',
 
-	async render({ api, root, toast, confirm }) {
+	async render({ api, root, toast, confirm, navigate }) {
 		const load = async () => {
 			const [capabilities, catalog, updateStatus, deviceApps] = await Promise.all([
 				api.veci('capabilities').catch(() => ({})),
@@ -77,6 +77,7 @@ export default {
 						<h2>Router apps</h2>
 						<p>Optional capabilities stay outside VeCI Core. Only catalogued packages from the router's compatible package source can be managed here.</p>
 					</div>
+					<button class="button button-secondary" id="open-hotspot-tools" type="button">Hotspot settings</button>
 				</div>
 				<div class="app-grid">
 					${state.apps
@@ -118,6 +119,8 @@ export default {
 									</div>
 								</article>
 							`;
+			root.querySelector('#open-hotspot-tools')?.addEventListener('click', () => navigate('hotspot'));
+
 						})
 						.join('')}
 				</div>
