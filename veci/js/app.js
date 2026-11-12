@@ -1,6 +1,7 @@
 import { VeciApi } from './lib/api.js';
 import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js';
 import { hydrateIcons, icon } from './lib/icons.js';
+import { ownerOf, primaryNavigation } from './lib/menu-policy.js';
 
 import homePage from './pages/home.js';
 import internetPage from './pages/internet.js';
@@ -119,7 +120,7 @@ class VeciApp {
 	renderNavigation() {
 		const nav = qs('#primary-nav');
 		nav.innerHTML = pages
-			.filter(page => !page.capability || this.state.capabilities?.[page.capability] !== false)
+			.filter(page => primaryNavigation(pages, this.state.capabilities).includes(page))
 			.map(
 				page => `
 				<a class="nav-link" href="#/${page.id}" data-route="${page.id}">
