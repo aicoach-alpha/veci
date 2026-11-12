@@ -56,11 +56,11 @@ write_sysctl_policy() {
     mv -f "$tmp" "$SYSCTL_POLICY"
 }
 set_if_changed() {
-    key="$1"
-    desired="$2"
-    current="$(uci -q get "$key" 2>/dev/null || :)"
-    if [ "$current" != "$desired" ]; then
-        uci set "$key=$desired"
+    setting_key="$1"
+    setting_value="$2"
+    setting_current="$(uci -q get "$setting_key" 2>/dev/null || :)"
+    if [ "$setting_current" != "$setting_value" ]; then
+        uci set "$setting_key=$setting_value"
         CHANGED=1
     fi
 }
