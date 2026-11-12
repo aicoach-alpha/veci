@@ -1,0 +1,8 @@
+#!/bin/sh /etc/rc.common
+# Apply IPv6 policy before normal network startup; never run on live config changes.
+START=18
+STOP=05
+start() {
+    [ -x /usr/libexec/veci-ipv6-policy ] || return 1
+    /usr/libexec/veci-ipv6-policy boot
+}
