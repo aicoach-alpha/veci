@@ -35,6 +35,11 @@ define Package/veci/install
 
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./files/rpcd-veci $(1)/usr/libexec/rpcd/veci
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/veci-ipv6-policy $(1)/usr/libexec/veci-ipv6-policy
+	$(INSTALL_DIR) $(1)/etc/init.d $(1)/etc/rc.d
+	$(INSTALL_BIN) ./files/veci-ipv6-init $(1)/etc/init.d/veci-ipv6-policy
+	ln -sf ../init.d/veci-ipv6-policy $(1)/etc/rc.d/S18veci-ipv6-policy
 
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./rpcd-acl.json $(1)/usr/share/rpcd/acl.d/veci.json
