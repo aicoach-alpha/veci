@@ -119,7 +119,6 @@ export default {
 									</div>
 								</article>
 							`;
-			root.querySelector('#open-hotspot-tools')?.addEventListener('click', () => navigate('hotspot'));
 
 						})
 						.join('')}
@@ -141,6 +140,8 @@ export default {
 					${state.deviceApps?.feed_configured === true && state.deviceApps?.feed_verified !== true ? '<button id="verify-app-feed" class="button button-secondary" type="button">Verify signed App Store feed</button>' : ''}
 				</div>
 			`;
+
+			root.querySelector('#open-hotspot-tools')?.addEventListener('click', () => navigate('hotspot'));
 
 			const verifyFeed = root.querySelector('#verify-app-feed');
 			verifyFeed?.addEventListener('click', async () => {
