@@ -119,7 +119,6 @@ export default {
 									</div>
 								</article>
 							`;
-
 						})
 						.join('')}
 				</div>
