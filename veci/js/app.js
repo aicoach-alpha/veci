@@ -6,29 +6,28 @@ import { primaryNavigation, routeTarget, menuOwner } from './lib/menu-policy.js'
 import homePage from './pages/home.js?v=161';
 import internetPage from './pages/internet.js';
 import wifiPage from './pages/wifi.js';
-import devicesPage from './pages/devices.js';
 import securityPage from './pages/security.js';
 import networkPage from './pages/network.js';
 import systemPage from './pages/system.js';
 import cellularPage from './pages/cellular.js?v=160';
-import updatesPage from './pages/updates.js';
 import appsPage from './pages/apps.js';
-import hotspotPage from './pages/hotspot.js';
 
 const pages = [
 	homePage,
 	internetPage,
 	wifiPage,
-	devicesPage,
 	cellularPage,
-	hotspotPage,
 	securityPage,
 	networkPage,
 	systemPage,
-	updatesPage,
 	appsPage
 ];
 const pageMap = new Map(pages.map(page => [page.id, page]));
+const lazyPages = {
+	devices: () => import('./pages/devices.js'),
+	hotspot: () => import('./pages/hotspot.js'),
+	updates: () => import('./pages/updates.js')
+};
 
 class VeciApp {
 	constructor() {
@@ -154,7 +153,17 @@ class VeciApp {
 		if (!this.api.sessionId) return;
 		const requestId = ++this.pageRequest;
 		const pageId = routeTarget(window.location.hash.replace(/^#\//, '').split('/')[0] || 'home');
-		const page = pageMap.get(pageId) || homePage;
+		let page = pageMap.get(pageId);
+		if (!page && lazyPages[pageId]) {
+			try {
+				page = (await lazyPages[pageId]()).default;
+				if (requestId !== this.pageRequest) return;
+				pageMap.set(pageId, page);
+			} catch (error) {
+				console.error('Optional page failed to load', error);
+			}
+		}
+		page ||= homePage;
 
 		if (this.activeCleanup) {
 			this.activeCleanup();
