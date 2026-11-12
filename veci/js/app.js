@@ -1,6 +1,7 @@
 import { VeciApi } from './lib/api.js';
 import { escapeHtml, qs, qsa, setBusy } from './lib/dom.js';
 import { hydrateIcons, icon } from './lib/icons.js';
+import { primaryNavigation, routeTarget, menuOwner } from './lib/menu-policy.js';
 
 import homePage from './pages/home.js?v=161';
 import internetPage from './pages/internet.js';
@@ -122,8 +123,7 @@ class VeciApp {
 
 	renderNavigation() {
 		const nav = qs('#primary-nav');
-		nav.innerHTML = pages
-			.filter(page => !page.capability || this.state.capabilities?.[page.capability] !== false)
+		nav.innerHTML = primaryNavigation(pages, this.state.capabilities)
 			.map(
 				page => `
 				<a class="nav-link" href="#/${page.id}" data-route="${page.id}">
@@ -147,13 +147,13 @@ class VeciApp {
 	}
 
 	navigate(pageId) {
-		window.location.hash = `#/${pageId}`;
+		window.location.hash = `#/${routeTarget(pageId)}`;
 	}
 
 	async route() {
 		if (!this.api.sessionId) return;
 		const requestId = ++this.pageRequest;
-		const pageId = (window.location.hash.replace(/^#\//, '').split('/')[0] || 'home').toLowerCase();
+		const pageId = routeTarget(window.location.hash.replace(/^#\//, '').split('/')[0] || 'home');
 		const page = pageMap.get(pageId) || homePage;
 
 		if (this.activeCleanup) {
@@ -161,7 +161,7 @@ class VeciApp {
 			this.activeCleanup = null;
 		}
 
-		qsa('.nav-link[data-route]').forEach(link => link.classList.toggle('active', link.dataset.route === page.id));
+		qsa('.nav-link[data-route]').forEach(link => link.classList.toggle('active', link.dataset.route === menuOwner(page.id)));
 		qs('#page-eyebrow').textContent = page.eyebrow || 'ROUTER';
 		qs('#page-title').textContent = page.title;
 		document.body.classList.remove('menu-open');
