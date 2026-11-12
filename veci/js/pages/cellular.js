@@ -29,15 +29,25 @@ export default {
 
 		// A native carrier-authenticated snapshot is the only source of numeric
 		// quota. Other states (including uninstalled quota service) fail closed.
-		const quotaReady = quota?.schema === 1 && quota?.provider === 'xl' &&
-			quota?.state === 'ready' && quota?.source === 'carrier_authenticated' &&
-			typeof quota?.total_bytes === 'number' && Number.isFinite(quota.total_bytes) &&
-			typeof quota?.remaining_bytes === 'number' && Number.isFinite(quota.remaining_bytes) &&
-			quota.total_bytes > 0 && quota.remaining_bytes >= 0 &&
+		const quotaReady =
+			quota?.schema === 1 &&
+			quota?.provider === 'xl' &&
+			quota?.state === 'ready' &&
+			quota?.source === 'carrier_authenticated' &&
+			typeof quota?.total_bytes === 'number' &&
+			Number.isFinite(quota.total_bytes) &&
+			typeof quota?.remaining_bytes === 'number' &&
+			Number.isFinite(quota.remaining_bytes) &&
+			quota.total_bytes > 0 &&
+			quota.remaining_bytes >= 0 &&
 			quota.remaining_bytes <= quota.total_bytes;
-		const quotaState = quotaReady ? 'Verified balance' :
-			quota?.state === 'not_connected' ? 'XL account not connected' :
-			quota?.state === 'stale' ? 'Balance expired' : 'Balance unavailable';
+		const quotaState = quotaReady
+			? 'Verified balance'
+			: quota?.state === 'not_connected'
+				? 'XL account not connected'
+				: quota?.state === 'stale'
+					? 'Balance expired'
+					: 'Balance unavailable';
 		const quotaSize = n => (n / 1073741824).toFixed(2) + ' GB';
 
 		root.innerHTML = `

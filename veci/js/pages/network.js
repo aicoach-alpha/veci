@@ -15,7 +15,6 @@ export default {
 		]);
 		const interfaces = interfacesResult.interface || [];
 
-
 		const ipv6Available = ipv6Policy?.ok === true;
 		const ipv6Panel = ipv6Available
 			? `
@@ -102,7 +101,6 @@ export default {
 			</section>
 		`;
 
-
 		root.querySelector('#network-devices')?.addEventListener('click', () => navigate('devices'));
 		const ipv6Form = root.querySelector('#ipv6-policy-form');
 		ipv6Form?.addEventListener('submit', async event => {
@@ -110,7 +108,8 @@ export default {
 			const enabled = root.querySelector('#ipv6-mode').value === 'on';
 			const allowed = await confirm({
 				title: enabled ? 'Enable IPv6 after next restart?' : 'Disable IPv6 after next restart?',
-				message: 'The new mode will be saved now, without interrupting Wi-Fi or LTE. It takes effect when the router is next restarted. IPv6 Internet access depends on modem and operator support.',
+				message:
+					'The new mode will be saved now, without interrupting Wi-Fi or LTE. It takes effect when the router is next restarted. IPv6 Internet access depends on modem and operator support.',
 				confirmLabel: 'Save setting'
 			});
 			if (!allowed) return;
@@ -121,8 +120,9 @@ export default {
 				if (result?.ok !== true) {
 					throw new Error(result?.error || 'Could not save IPv6 mode');
 				}
-				root.querySelector('#ipv6-note').textContent =
-					result.pendingReboot ? 'Change saved; it will take effect on the next router restart.' : 'IPv6 mode saved; no network restart was performed.';
+				root.querySelector('#ipv6-note').textContent = result.pendingReboot
+					? 'Change saved; it will take effect on the next router restart.'
+					: 'IPv6 mode saved; no network restart was performed.';
 				toast('IPv6 setting saved without interrupting the current connection.', 'success');
 			} catch (error) {
 				toast(error.message || 'Could not save IPv6 mode.', 'error');
