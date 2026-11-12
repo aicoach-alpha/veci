@@ -1,0 +1,44 @@
+name: VeCI IPv6 and single-menu safety
+on:
+  pull_request:
+    paths:
+      - 'files/veci-ipv6-*'
+      - 'files/rpcd-veci'
+      - 'files/veci.config'
+      - 'rpcd-acl.json'
+      - 'veci/js/**'
+      - 'tests/**'
+      - '.github/workflows/ipv6-menu-stability.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell parse
+        run: |
+          sh -n files/rpcd-veci
+          sh -n files/veci-ipv6-policy
+          sh -n files/veci-ipv6-init
+      - name: Canonical menu tests
+        run: node --test tests/menu-policy.test.mjs
+      - name: Safety and ACL contracts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          acl=json.loads(Path('rpcd-acl.json').read_text())['veci']
+          assert 'ipv6Status' in acl['read']['ubus']['veci']
+          assert 'ipv6Configure' in acl['write']['ubus']['veci']
+          source=Path('files/veci-ipv6-policy').read_text()
+          configure=source.split('configure() {',1)[1].split('\nboot() {',1)[0]
+          for forbidden in ('sysctl -w', 'ifup ', 'ifdown ', 'wifi reload', '/etc/init.d/', 'reboot', 'network reload'):
+              assert forbidden not in configure, forbidden
+          assert 'managed || exit 0' in source
+          assert 'legacy_ipv4_only_policy_requires_migration' in source
+          assert "option enabled '0'" in Path('files/veci.config').read_text()
+          assert "START=18" in Path('files/veci-ipv6-init').read_text()
+          print('VeCI IPv6 safety contract PASS')
+          PY
