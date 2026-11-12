@@ -19,6 +19,9 @@ kernel_disabled() {
 legacy_conflict() {
     [ -f "$LEGACY_POLICY" ] && grep -q '^net.ipv6.conf.all.disable_ipv6=1$' "$LEGACY_POLICY"
 }
+managed() {
+    uci -q get veci.ipv6 >/dev/null 2>&1
+}
 status() {
     desired="$(enabled)"
     runtime="$(kernel_disabled)"
@@ -27,13 +30,15 @@ status() {
     if [ "$desired" = 1 ] && [ "$runtime" = 0 ] && ! legacy_conflict; then pending=false; fi
     conflict=false
     if legacy_conflict; then conflict=true; fi
+    ismanaged=true
+    if ! managed; then ismanaged=false; fi
     [ "$desired" = 1 ] && desired=true || desired=false
     case "$runtime" in
         0) runtime=enabled ;;
         1) runtime=disabled ;;
         *) runtime=unknown ;;
     esac
-    printf '{"ok":true,"desiredEnabled":%s,"runtime":"%s","pendingReboot":%s,"legacyConflict":%s,"appliesAt":"next_boot"}\n'         "$desired" "$runtime" "$pending" "$conflict"
+    printf '{"ok":true,"desiredEnabled":%s,"runtime":"%s","pendingReboot":%s,"legacyConflict":%s,"managed":%s,"appliesAt":"next_boot"}\n'         "$desired" "$runtime" "$pending" "$conflict" "$ismanaged"
 }
 write_sysctl_policy() {
     # Never follow a symlink. Atomic replacement keeps the boot-time setting readable.
@@ -73,7 +78,10 @@ configure() {
         error legacy_ipv4_only_policy_requires_migration
     fi
     old="$(enabled)"
-    if [ "$old" = "$desired" ]; then status; return; fi
+    if [ "$old" = "$desired" ] && managed; then status; return; fi
+    if ! managed; then
+        uci set veci.ipv6=ipv6 || error uci_write_failed
+    fi
     # Persist desired mode only; the running network remains unchanged.
     uci set "veci.ipv6.enabled=$desired" || error uci_write_failed
     uci commit veci || error uci_commit_failed
@@ -82,6 +90,9 @@ configure() {
 }
 boot() {
     [ "$(id -u)" = 0 ] || exit 1
+    # Preserve pre-existing router configuration on upgrades where the managed
+    # VeCI IPv6 section has never been explicitly initialized.
+    managed || exit 0
     desired="$(enabled)"
     if [ "$desired" = 1 ] && legacy_conflict; then
         logger -t veci-ipv6 'legacy IPv4-only policy conflicts with requested IPv6; refusing partial enable' || :
