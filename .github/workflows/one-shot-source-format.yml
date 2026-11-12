@@ -1,0 +1,37 @@
+name: VeCI one-shot exact-branch JS formatter
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/one-shot-source-format.yml'
+      - 'veci/js/lib/menu-policy.js'
+      - 'veci/js/pages/network.js'
+      - 'veci/js/pages/cellular.js'
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/ipv6-toggle-single-menu-low-downtime-20261112'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '8.15.9'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --write veci/js/lib/menu-policy.js veci/js/pages/network.js veci/js/pages/cellular.js
+      - run: git diff --check
+      - name: Commit formatted source if needed
+        run: |
+          if ! git diff --quiet -- veci/js/lib/menu-policy.js veci/js/pages/network.js veci/js/pages/cellular.js; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add veci/js/lib/menu-policy.js veci/js/pages/network.js veci/js/pages/cellular.js
+            git commit -m 'style(veci): format menu IPv6 and pre-existing cellular assets'
+            git push origin HEAD:feat/ipv6-toggle-single-menu-low-downtime-20261112
+          fi
