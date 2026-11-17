@@ -321,7 +321,10 @@ export default {
 			// Read-only runtime preflight; do not mutate UCI or cycle the radio on a stale netifd AP.
 			const latestEvidence = await api.wifiRuntimeEvidence().catch(() => null);
 			if (!canActivateGuestOnRadio(networks, radioCandidate, latestEvidence)) {
-				toast('Guest Wi-Fi cannot be activated: existing AP is unavailable or unverified. No changes were made.', 'error');
+				toast(
+					'Guest Wi-Fi cannot be activated: existing AP is unavailable or unverified. No changes were made.',
+					'error'
+				);
 				return;
 			}
 			const ssidLength = new TextEncoder().encode(ssid).length;
