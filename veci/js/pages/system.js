@@ -135,7 +135,6 @@ export default {
 		);
 		refreshLogs.addEventListener('click', loadLogs);
 
-
 		const hostnameForm = root.querySelector('#hostname-form');
 		hostnameForm?.addEventListener('submit', async event => {
 			event.preventDefault();
