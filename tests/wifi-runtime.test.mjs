@@ -2,35 +2,44 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { wifiRuntimeState } from '../veci/js/pages/wifi.js';
 
-test('enabled configuration without AP runtime never claims broadcast', () => {
-	assert.deepEqual(wifiRuntimeState({ disabled: '0' }, { disabled: '0' }, null), {
-		label: 'AP unavailable',
+const iface = { radio: { up: true }, iface: { section: 'default_radio0', ifname: 'phy0-ap0' } };
+const healthy = { kernel_ifnames: ['phy0-ap0'], hostapd_ready_ifnames: ['phy0-ap0'] };
+
+test('UCI enabled without netifd interface remains unavailable', () => {
+	assert.equal(wifiRuntimeState({}, {}, null, healthy).label, 'AP unavailable');
+});
+
+test('stale netifd phy0-ap0 cannot mask a missing kernel interface', () => {
+	assert.deepEqual(wifiRuntimeState({}, {}, iface, { kernel_ifnames: [], hostapd_ready_ifnames: [] }), {
+		label: 'AP interface missing',
 		tone: 'warning'
 	});
 });
 
-test('radio0 up without runtime iface remains unavailable', () => {
-	assert.equal(wifiRuntimeState({}, {}, { radio: { up: true } }).label, 'AP unavailable');
-});
-
-test('radio0 down is unavailable despite an iface entry', () => {
+test('kernel AP exists but hostapd is absent or disabled', () => {
 	assert.equal(
-		wifiRuntimeState({}, {}, { radio: { up: false }, iface: { section: 'default_radio0' } }).label,
-		'AP unavailable'
+		wifiRuntimeState({}, {}, iface, { kernel_ifnames: ['phy0-ap0'], hostapd_ready_ifnames: [] }).label,
+		'AP not ready'
 	);
 });
 
-test('live netifd configuration does not prove visible beacon', () => {
-	const state = wifiRuntimeState({}, {}, {
-		radio: { up: true },
-		iface: { section: 'default_radio0' }
-	});
-	assert.equal(state.label, 'AP configured · beacon unverified');
+test('kernel AP and hostapd both ready do not prove externally visible SSID', () => {
+	const state = wifiRuntimeState({}, {}, iface, healthy);
+	assert.equal(state.label, 'AP running · beacon unverified');
 	assert.notEqual(state.tone, 'success');
 });
 
+test('missing evidence on older firmware never falsely reports broadcasting', () => {
+	assert.equal(wifiRuntimeState({}, {}, iface, null).label, 'AP status unverified');
+	assert.equal(wifiRuntimeState({}, {}, { radio: { up: true }, iface: { section: 'x' } }, healthy).label, 'AP status unverified');
+});
+
+test('radio down despite a configured interface is unavailable', () => {
+	assert.equal(wifiRuntimeState({}, {}, { radio: { up: false }, iface: iface.iface }, healthy).label, 'AP unavailable');
+});
+
 test('explicit radio or AP disable is reflected correctly', () => {
-	assert.equal(wifiRuntimeState({ disabled: '1' }, {}, null).label, 'Disabled');
-	assert.equal(wifiRuntimeState({}, { disabled: '1' }, null).label, 'Disabled');
-	assert.equal(wifiRuntimeState({ disabled: 1 }, {}, null).label, 'Disabled');
+	assert.equal(wifiRuntimeState({ disabled: '1' }, {}, null, healthy).label, 'Disabled');
+	assert.equal(wifiRuntimeState({}, { disabled: '1' }, null, healthy).label, 'Disabled');
+	assert.equal(wifiRuntimeState({ disabled: 1 }, {}, null, healthy).label, 'Disabled');
 });
