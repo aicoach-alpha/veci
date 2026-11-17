@@ -451,8 +451,11 @@ export default {
 				])
 					await api.uciDelete(config, section).catch(() => {});
 				for (const config of ['network', 'dhcp', 'firewall', 'wireless']) await api.uciCommit(config);
-				// This removal path is available only when the managed guest AP is inactive.
-				await reloadGuestServices(api, { reloadWireless: false, reloadNetwork: false });
+				// Only skip full network and radio reload when the managed guest AP was already disabled.
+				await reloadGuestServices(api, {
+					reloadWireless: !boolOption(managedGuest?.disabled),
+					reloadNetwork: !boolOption(managedGuest?.disabled)
+				});
 				toast('Guest Wi-Fi removed.', 'success');
 				setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 1600);
 			} catch (error) {
