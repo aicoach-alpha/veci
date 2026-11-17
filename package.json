@@ -25,7 +25,7 @@
 		"test:modem": "node --test tests/modem-messages.test.mjs",
 		"test:firmware": "node --test tests/firmware-updates.test.mjs",
 		"test:cellular": "node --test tests/cellular-parity.test.mjs",
-		"test:wifi": "node --test tests/wifi-runtime.test.mjs"
+		"test:wifi": "node --test tests/wifi-runtime.test.mjs tests/wifi-rpc.test.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "9.39.1",
