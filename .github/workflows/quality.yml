@@ -75,9 +75,7 @@ jobs:
 
       - name: Retired USSD and operator quota UI contract
         run: |
-          ! grep -qi 'ussd' veci/js/pages/cellular.js
-          grep -Fq "api.call('veci.quota', 'status'" veci/js/pages/cellular.js
-          grep -Fq "quotaSummary" veci/js/pages/cellular.js
+          ! grep -Eqi 'ussd|veci\.quota|quotaSummary|carrier-quota' veci/js/pages/cellular.js
           grep -Fq "verifyFeed" veci/js/pages/apps.js
 
       - name: Check RPC helper syntax
